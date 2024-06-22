@@ -1,6 +1,11 @@
-General Notes
+
+###############################################################################
+#                        Art of Exploitation Notes                            # 
+###############################################################################
+General
 * Computer is little endian so the first byte is is least significant
 * All examples come from Hacking: The Art of Exploitation
+* The notes are for Chapter 3 Exploitation and portions of Chapter 4 Networking
 * Environment: Ubuntu 7, gcc 3.3.6
 
 
@@ -268,6 +273,79 @@ arg9x17 (JUNK), write to arg10 (mem addr 4)
 
 ### Networking
 
+# OSI layers
+7 Application Layer
+  - applications can access network
+6 Presentation Layer
+  - data is in usable format 
+
+5 Session Layer
+  - sockets and responsible for controlling ports and sessions
+
+4 Transport Layer
+  - TCP/UDP transmission protocols
+  - TCP flags, URG (urgent), ACK (acknowledgement), PSH (push), RST (reset), SYN (synchronize),
+    FIN (finish)
+  - TCP header:
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |          Source Port          |       Destination Port        |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                        Sequence Number                        |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                    Acknowledgment Number                      |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |  Data |           |U|A|P|R|S|F|                               |
+    | Offset| Reserved  |R|C|S|S|Y|I|            Window             |
+    |       |           |G|K|H|T|N|N|                               |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |           Checksum            |         Urgent Pointer        |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                    Options                    |    Padding    |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                             data                              |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  - UDP contains much less overhead and built-in functionality than TCP.
+  - UDP header contains, source port, destination port, length, checksum
+
+3 Network Layer
+  - IP address physical path that the data will take
+  - IP header:
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |Version|  IHL  |Type of Service|          Total Length         |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |         Identification        |Flags|     Fragment Offset     |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |  Time to Live |    Protocol   |         Header Checksum       |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                       Source Address                          |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                    Destination Address                        |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    |                    Options                    |    Padding    |
+    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  - ICMP (Internet Control Message Protocol) used for messaging and diagnostic.
+    Example is ping command where ICMP Echo request and Echo Reply are used
+
+2 Data-Link Layer
+  - Ethernet addressing between Ethernet ports MAC (Media Address Control) addresses. Every 
+    Ethernet device is assigned a globally unique addr. MAC is hard coded into the device
+    by manufacturer, not meant to change.
+  - Ethernet header contains source and destination MAC addr for Ethernet packet
+  - ARP (address resolution protocol) allows "seating charts" to be made to associate an IP addr
+    with a piece of hardware
+  - Broadcast addr is Ethernet addressing which will be sent to all the connected devices
+  - ARP request is a message sent to the broadcast addr, that contains the sender's IP addr 
+    and MAC addr and asks for corresponding MAC addr for IP addr
+  - ARP reply is the response that is sent to the requester's MAC addr & IP addr
+
+1 Physical Layer
+  - Wire and protocol used to send bits from one device to another
+
+
 # Sockets
 * standard way to perform network communication through the OS (an abstraction)
 * Stream sockets are reliable two way communication using TCP so that packets of data will 
@@ -304,6 +382,7 @@ recv(int fd, void *buffer, size_t n, int flags)
   Receives n bytes from socket fd into *buffer; returns the number of bytes
   received or -1 on error
 
+
 # Socket Addresses
 * SOCKADDR_COMMON defines the address family of the address because of protocols.
 * Since an address can contain different types of information depending on the address family.
@@ -312,12 +391,88 @@ recv(int fd, void *buffer, size_t n, int flags)
 * Specific socketaddr such as socketaddr_in holds port number and internet address because that 
   defines a socket address 
 
+
 # Socket Programming/Network Programming 
 * Step 1: create a socket (socket())
 * Step 2: bind the socket to a port (bind())
 * Step 3: Listen for incoming connection requests & identify ones (listen())
 * Step 4: Accept the identified connection request and open the socket (accept())
 * Step 5: Attempt to establish a connection (connect())
+
+
+# Web Server
+* We can create a web server that can send and recieve http requests. (tinyweb.c)
+* loopback address 127.0.0.1 called localhost which allows a device to send and recieve its own
+  data packets. 
+
+
+# Network Sniffing
+* On an unswitched network, Ethernet packets pass through every device on the network, expecting 
+  each system device to only look at the packets sent to its destination address. 
+* Promiscuous mode, causes it to look at all packets, regardless of the destination addr. 
+
+* Raw Socket Sniffer. Can access the network at lower layers using raw sockets. raw_tcpsniff.c
+  This can be done by opening a raw TCP socket and listening for packets.
+  (architecture dependent code)
+
+* libpcap is library that can work with raw sockets on multiple architectures
+  pcap_pkthdr (pcap packet header), pcap_t (packet handle which is kind of file desc)
+  - pcap_lookupdev(buffer)
+    looks for device to sniff on
+  - pcap_open_live(device, buffer size, promiscuous flag, time out, buffer) 
+    opens packet-capturing device
+  - pcap_next(pcap_handle, & pcap header) 
+    which grabs next packet
+  - int pcap_loop(pcap_t *handle, int count, pcap_handler callback, u_char *args)
+    This function is passed a fptr which is called every time a packet is captured for count times
+    callback must be in form of: 
+    void callback(u_char *args, const struct pcap_pkthdr *cap_header, const u_char *packet)
+
+
+# Active Sniffing *** INCOMPLETE
+* In a switched network environment packets are only sent to the port they are destined for, 
+  according to their destination MAC addresses. 
+  Means that promiscuous devices cannot sniff additional packets. 
+* Spoofing is forging a source address in a packet
+  - First, when an ARP reply comes in with an IP address that already exists in the ARP cache, the 
+    receiving system will overwrite the prior MAC address information with the new information
+    found in the reply
+  - Second, no state information about the ARP traffic is kept, since this would require additional 
+    memory and would complicate a protocol that is meant to be simple. This means systems will 
+    accept an ARP reply even if they didn’t send out an ARP request.
+* ARP redirection, attacker sends spoofed ARP replies to certain devices. To sniff network traffic
+  between two points A and B, the attacker must poison the ARP cache of A so that A believes that B's
+  IP addr is at the attacker's MAC addr and poison the ARP cache of B so that B believes that A's IP 
+  addr is at the attacker's MAC addr. The attacker can then forward these packets to their appropriate
+  final destinations.
+    
+  
+# Denial of Service *** INCOMPLETE
+* SYN Flooding, floods the victim's system with many SYN packets, using a spoofed nonexistent 
+  source address.
+  - a SYN packet is used to initiate a TCP connection, the victim’s machine will send a SYN/ACK 
+    packet to the spoofed address in response and wait for the expected ACK response
+  - Each of these waiting, half-open connections goes into a backlog queue that has limited space  
+  - Since the spoofed source addresses don’t actually exist, the ACK responses needed to remove 
+    these entries from the queue and complete the connections never come
+  - These half open connections will time out which takes a long time
+  - As long as the attacker continues to flood the victim's system with spoofed SYN packets,
+    the backlog queue will remain full, and makes it impossible for real SYN packets to get to the 
+    system and initiate valid TCP/IP connections
+  
+
+
+###############################################################################
+#                         Practical Binary Analysis                           #
+###############################################################################
+
+
+
+
+
+###############################################################################
+#                              Other Exploits                                 #
+###############################################################################
 
 
 ### Return to libc
@@ -328,6 +483,7 @@ recv(int fd, void *buffer, size_t n, int flags)
 
 Function address | Return address | arg 1 | arg2 ...
 (addr of system)   (can be fake)    (/bin/sh)
+
 
 
 ### Path Priviledge Escalation  
@@ -351,5 +507,6 @@ https://www.hackingarticles.in/linux-privilege-escalation-using-path-variable/
 - ln -s /bin/sh ps 
 
 * This will execute the contents of the touch file and thus allow for priviledge esc 
+
 
 
