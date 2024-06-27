@@ -438,6 +438,8 @@ Sections:
   - Section Header
   - Sections
   - Program Header
+3. The PE Format
+4. Building a Binary Loader
 
 
 ############################ Anatomy of a Binary ##############################
@@ -545,7 +547,7 @@ https://refspecs.linuxfoundation.org/elf/elf.pdf
 * ELF binary components
   1. executable header
   2. program headers (optional)
-  3. number of sections
+  3. sections
   4. section headers (optional) one per section
 * The program header and section header tables need not be located at any particular offset 
   in the binary file
@@ -608,7 +610,6 @@ https://refspecs.linuxfoundation.org/elf/elf.pdf
 * Becuase sections are intended to provide a view for the linker only, the section header 
   table is optional. ELF files that don't need linking are not required to have a section  
   header table
-* This Logical organization exists only at link time
 
   typedef struct {
     uint32_t sh_name;       // Section name - index into string table .shrstrtab
@@ -716,33 +717,53 @@ Disassembly of a .plt section
   - .got.plt is a data section that is writable
   - It exists as an extra layer of security so that executable sections like .plt and .text
     can not be writable. (AVOID WRITABLE CODE SECTIONS)
-* .rel.* and .rela.*  // table of relocation entries
-* .dynamic            // 
+
+* .rel.* & .rela.*  // Table of relocation entries
+* .dynamic          // Lists dependencies 
+* .init_array       // Data section that contains any number of fptrs.
+                    // These are called when binary is init, before main is called
+* .fini_array       // Data section that contains any number of fptrs.
+                    // These are called when binary is ending, destructors
+* .shstrtab         // Array of strings that contain names of all sections in binary
+* .symtab           // Contains a symbol table which is a table of Elf64_Sym structs
+                    // Associates a symbolic name with a piece of code or data 
+                    // elsewhere in the binary such as function or var.
+* .strtab           // Strings containing the symbolic names. 
+* .dynsym & .dynstr // Analoguous to .symtab & .strtab, except they contain symbols and 
+                    // strings needed for dynamic linking
 * Disassemble a specific section
   - $ objdump -M intel --section .plt -d a.out
 
-
-
-
-
-
-
-
 # Program Headers
+* Provides a segment view of binary instead of section view.
+  - Section view of an ELF binary is meant for static linking purposes
+  - Segment view is used for OS during execution and dynamic linker
+* An ELF segment encompasses zero or more sections, essentially bundling these into a 
+  single chunk
+* Because segments provide an execution view they are needed only for executable ELF files
+  
+  typedef struct {
+    uint32_t        p_type;    // Segment type
+    uint32_t        p_flags;   // Segment flags
+    uint64_t        p_offset;  // Segment file offset
+    uint64_t        p_vaddr;   // Segment virtual addr
+    uint64_t        p_paddr;   // Segment physical addr
+    uint64_t        p_filesz;  // Segment size in file
+    uint64_t        p_memsz;   // Segment size in memory
+    uint64_t        p_align;   // Segment alignment
+  } Elf64_Phdr;
 
-typedef struct {
-  uint32_t        p_type;
-  uint32_t        p_flags;
-  uint64_t        p_offset;
-  uint64_t        p_vaddr;
-  uint64_t        p_paddr;
-  uint64_t        p_filesz;
-  uint64_t        p_memsz;
-  uint64_t        p_align;
-} Elf64_Phdr;
+* Read Program headers
+  - $ readelf --wide --segments a.out
+
+############################## PE Format ######################################
 
 
+#################### Building a Binary Loader Using LIBBFD ####################
+* The Binary File Descriptor Library (libbfd) provides common interface for reading
+  and parsing all popular binary formats
 
+  
     
 
 ###############################################################################
