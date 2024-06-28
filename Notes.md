@@ -762,8 +762,31 @@ Disassembly of a .plt section
 #################### Building a Binary Loader Using LIBBFD ####################
 * The Binary File Descriptor Library (libbfd) provides common interface for reading
   and parsing all popular binary formats
+* Static Symbol Table
+  - Created at compile time
+  - Not needed for process creation
+  - Can be stripped from a binary
+* Dynamic Symbol Table
+  - Created at runtime 
+  - Used by dynamic linker to resolve which dynamic libraries to map into the addr space
+    of the program
 
+###################### Basic Binary Analysis in Linux #########################
+* file
+  - finds what type each file is. Not fooled by extensions
+  - $ file -z (peek inside zipped files) file
+* head
+  - outputs first few (10) lines of a file
+* tail
+  - outputs last few lines of a file
+* base64
+  - encode binary data as ASCII text
+  - $ base64 -d file
+* tar xzvf (unzip using gzip and extract payload) payload
+* ldd 
+  - find out the shared objects (libraries) required by a program
   
+
     
 
 ###############################################################################
