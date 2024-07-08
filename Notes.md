@@ -596,6 +596,20 @@ https://refspecs.linuxfoundation.org/elf/elf.pdf
                                  // string table section .shstrtab (ASCII string of names)
   } Elf64_Ehdr;
 
+  e_ident[] Identification Indexes
+  Name	        Value   Purpose
+  EI_MAG0	0	File identification
+  EI_MAG1	1	File identification
+  EI_MAG2	2	File identification
+  EI_MAG3	3	File identification
+  EI_CLASS	4	File class
+  EI_DATA	5	Data encoding
+  EI_VERSION	6	File version
+  EI_OSABI	7	Operating system/ABI identification
+  EI_ABIVERSION	8	ABI version
+  EI_PAD	9	Start of padding bytes
+  EI_NIDENT	16	Size of e_ident[]
+
 * "Every ELF file starts with an executable header which is just a structured series of
   bytes telling you that it's an ELF file, what kind of ELF file, and where to find other 
   contents"
@@ -783,11 +797,157 @@ Disassembly of a .plt section
   - encode binary data as ASCII text
   - $ base64 -d file
 * tar xzvf (unzip using gzip and extract payload) payload
+  - decompress files
 * ldd 
   - find out the shared objects (libraries) required by a program
-  
+* xxd
+  - outputs the contents of a file in hex
+* dd
+  - convert or copy a file
+  - $ dd skip=52 count=64 if=67b8601 of=elf_header bs=1
+* readelf
+  - display information about ELF files
+* nm
+  - display symbol information in object files (can also demangle)
+* strings
+  - checks for strings in any file (including bins)
+  - doesn't check if strings were intended to be readable, so may output bogus results
+    as a result of binary sequences that so happen to be printable
 
+* When functions are be overloaded like (C++), compilers emit mangled function names
+  A mangled name is a combination of the original function name andd en encoding of the
+  function parameters. 
+  - Mangled function names give free type information by revealing the expected parameters
+    of a function.
+* Linker checks the following folders when resolving binary dependencies
+  - LD_LIBRARY_PATH environment variable
+  - Dirs in binary's rpath
+  - For system dirs, /lib, /usr/lib, /lib64, /usr/lib64
+  - Dirs specified in /etc/ld.so.conf
+* $ echo $? 
+  - $? is a special variables in the shell that holds the exit status of the most
+    recently executed cmd. 0 indicates success, any non-zero indicates error
+
+# Tracing System Calls and Library Calls
+* strace
+  - show system calls 
+* ltrace 
+  - show library calls 
+
+# Examining Instruction-Level Behavior
+* objdump
+  - Examine instruction level assembly code of ELF
+* %rdi is a register for the first function argument
+  - %rsi (2nd), %rdx (3rd), %rcx (4th), %r8 (5th), %r9 (6th)
+  - http://6.s081.scripts.mit.edu/sp18/x86-64-architecture-guide.html
+* %pc is the program counter
+* %rip is instruction pointer. Holds the next instr to be executed
+  
+################ Disassembly and Binary Analysis Fundamentals #################
+* Static Disassembly is where the binary is not executed
+
+# Linear Disassembly - Static 
+* Iterates through all code segments in a binary decoding all bytes consecutively and
+  parsing them into a list of instructions 
+* Problems
+  - Not all bytes may be instructions (inline data). Disassembling this may result in 
+    invalid opcodes or result in bogus instructions 
+  - ISAs with variable length opcodes such as x86, inline data may cause the disassembler
+    to become desynchronized with respect to the true instr stream
+
+# Recursive Disassembly - Static
+* Sensitive to control flow
+* Starts from known entry points into the binary (main entry point, exported function 
+  symbols) and recursively follows control flow (jumps, calls) to discover code
+* Problems
+  - Difficult/Impossible to statically figure out the possible targets of indirect jump
+    or calls. Can miss blocks of code or even entire functions
+
+# Dynamic Disassembly
+* log instructions while being executing
+* Problems
+  - code coverage, the analysis only ever sees the instructions that are actually 
+    executed during the analysis 
+* Test Suites
+  - Run the analyzed binary with known test inputs (ex. Makefile tests)
+* Fuzzing
+  - automatically generate inputs to cover new code paths in a binary
+
+# Structuring Disassembled Code and Data
+* Function Detection
+  - Unstripped
+    - symbol table specifies set of functions (unstripped bins)
+  - Stripped 
+    - locate functions that are directly addressed by a call instruction (easy)
+    - indirect (fptrs), tail called (func ends with call to another func) locate funcs
+      using function signature patterns (function prologues, epilogues)
+
+# Modifying Shared Library Behavior Using LD_PRELOAD
+* LD_PRELOAD is env var that specifies libraries for the linker to load before any other
+  library. If a preloaded library contains a function with the same name as a function
+  in a library loaded later the first function is the one that will be used at runtime
+  - Can override library functions even stl lib funcs
+  - #include <dlfcn.h> is dynamic linker lib.
     
+# Injecting a Code Section
+* To add a new section to an ELF binary, first inject the bytes that the section will 
+  contain by appending them to the end of the binary. Create a section header and a 
+  program header for the injected section.
+  - program header table is usually located right after the executable header. Because
+    of this adding an extra program header would shift all of the sections and headers
+    that come after it. To avoid complex shifting, overwrite an existing program header.
+   _____________________
+  |                     |  ehdr:
+  |  Executable header  |  e_entry  = addr(.text)+off       -> addr(.injected)+off
+  |_____________________|
+  |                     |
+  |_____________________|  phdr:
+  |                     |  p_type   = PT_NOTE               -> PT_LOAD
+  |   Program header    |  p_offset = off(.note.ABI-tag)    -> off(.injected) 
+  |_____________________|  p_flags  = PF_R                  -> PF_R | PF_X
+  |_____________________|
+  |                     |
+  |_____________________|
+  |                     |
+  |        .text        |
+  |_____________________|
+  |                     |
+  |_____________________|
+  |                     |
+  |    .not.ABI-tag     |
+  |_____________________|
+  |_____________________|  shdr:
+  |                     |  sh_type   = SHT_NOTE            -> SHT_PROGBITS
+  |   Section header    |  sh_addr   = addr(.note.ABI-tag) -> addr(.injected)
+  |_____________________|  sh_flags  = SHF_ALLOC           -> SHF_ALLOC | SHF_EXECINSTR
+  |_____________________|  sh_addralign = 4                -> 16
+  |                     |  sh_size   = size(.note.ABI-tag) -> size(.injected)
+  |     .injected       |
+  |_____________________|
+* Replacing .note.ABI-tag with injected code section
+
+* Program headers which can be safely overwritten is the PT_NOTE header which describes
+  PT_NOTE segment
+  - The PT_NOTE segment encompasses sections that contain auxiliary info about the binary
+  - If a PT_NOTE segment sections are missing, the loader simple assumes it is a native
+    binary. 
+* Modify the Note program header and section header with new injected section info
+  - Optionally modify string table to change the name from .note.ABI-tag -> .injected
+- $ ./elfinject ls hello.bin ".injected" 0x800000 0
+  - (host_binary) (inject_file) (name) (address_injected_section) (offset_entry_point) 
+    -1 if none
+  - https://github.com/krakankrakan/elfinject
+
+# Calling Injected Code
+* Entry Point Modification
+  - Can change the entry point in ehdr to the start of the injected section
+  
+  - From assembly source code, (.s files) to raw binary file with only binary encodings
+    of assembly instructions and data (suitable for injection)
+    - $ nasm -f bin -o hello.bin hello.s  
+* Hijacking Constructors and Destructors
+
+
 
 ###############################################################################
 #                              Other Exploits                                 #
