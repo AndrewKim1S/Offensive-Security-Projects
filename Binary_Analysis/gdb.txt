@@ -1,7 +1,0 @@
-warning: Currently logging to gdb.txt.  Turn the logging off and on to make the new setting effective.
-Starting program: /usr/bin/ls 
-Warning:
-Cannot insert breakpoint 1.
-Cannot access memory at address 0x6aa0
-
-Program not restarted.
