@@ -6,7 +6,8 @@
 #                            Status: In Progress                              #
 ###############################################################################
 General:
-* Environment: Ubuntu 16, gcc 5.6
+* Environment: Ubuntu 16, gcc 5.6 
+* user: binary, pass: binary
 
 Sections:
 1. Anatomy of a Binary
@@ -21,6 +22,15 @@ Sections:
   - Program Header
 3. The PE Format
 4. Building a Binary Loader
+5. Basic Binary Analysis in Linux
+  - System & Library Calls
+  - Examining Instruction-Level Behavior
+6. Disassembly and Binary Analysis Fundamentals
+7. Simple Code Injection Techniques for ELF
+  - LD_PRELOAD
+  - Injecting Code Section
+  - Calling Injected Code
+8. Customizing Disassembly
 
 Links To Documentation:
 * elf format   https://refspecs.linuxfoundation.org/elf/elf.pdf
@@ -467,6 +477,8 @@ Disassembly of a .plt section
     - indirect (fptrs), tail called (func ends with call to another func) locate funcs
       using function signature patterns (function prologues, epilogues)
 
+################# Simple Code Injection Techniques for ELF ####################
+
 # Modifying Shared Library Behavior Using LD_PRELOAD
 * LD_PRELOAD is env var that specifies libraries for the linker to load before any other
   library. If a preloaded library contains a function with the same name as a function
@@ -545,12 +557,62 @@ Disassembly of a .plt section
 * Replace an existing library function with injected code
 * Overwrite the indirect jmp instruction to the .got to directly jmp to injected code
 
+# Redirecting Direct and Indirect Calls
+* When I want to use an injected function to replace a nonlibrary function, must overwrite
+  the calls directly with calls to the injected function
 
+########################### Customizing Disassembly ###########################
 
+# Obfuscation
+* Instruction Overlapping
+  - Most disassemblers output a single disassembly listing per binary because assumes
+    each byte in a binary is mapped to at most one instruction, each instruction is 
+    contained in a single basic block, and each block is part of a single func.
+    (Assumes that chunks of code don't overlap with each other)
+  - x86 instr vary in length, so instr can overlap
 
+# Capstone API to write custom disassemblers
+* csh                Capstone handle
+* cs_insn            Capstone Instruction
+* cs_open()          Open a properly configured Capstone instance
+* cs_disasm()        Disassembles a given buffer of machine code. Returns array of instrs  
+* cs_close()         Close Capstone instance
+* cs_disasm_itera()  Disassembles instrs one by one
 
+# Return Oriented Programming
+* Security measure (DEP) Data Execution Prevention, enforces that no region of memory is 
+  every writable and executable at the same time.
+  - Prevents Stack Smashing attacks
+  - Can be circumvented by redirecting existing code in the exploited binary or the libs
+    it uses. (ret2libc) 
+* Return Oriented Programming 
+  - Allows implementation of arbitrary malicious functionality by chaining together short
+    existing code sequences (gadgets) in the target program's memory space.
+  - Each gadget ends in a return instr and performs a basic operation. By carefully
+    selecting gadgets, attacker can create an instr set where each gadget forms an instr
+    and then use this instr set to craft arbitrary functionality (ROP program).
+  - ROP progrom have series of gadgets where the return instr terminating each gadget
+    transfers control to the next gadget in the chain
+       _______________
+       |              |                     An example ROP chain. Gadget g1 loads
+       |     &gn      |                     a constant into eax, which is then added
+       |______________|                     to esi by g2
+       _______________
+       |              |   add esi, eax
+       |     &g2      |-> ret
+       |______________|
+       |              |
+       |   constant   |
+       |______________|
+       |              |   pop eax
+       |     &g1      |-> ret
+ esp-> |______________|
 
-
+* Finding ROP Gadgets
+  - Find gadgets that end in return instr. Look for both aligned and unaligned gadgets
+    Keep gadget length limited
+  - To find gadgets scan binary for return instr (aligned & unaligned) and then traverse
+    backwards building longer gadgets as you go. 
 
 
 
