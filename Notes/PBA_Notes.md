@@ -614,8 +614,79 @@ Disassembly of a .plt section
   - To find gadgets scan binary for return instr (aligned & unaligned) and then traverse
     backwards building longer gadgets as you go. 
 
+########################### Binary Instrumentation ############################
 
+* Binary Instrumentation 
+  - Inserting new code at any point in an existing binary to observe or modify behavior.
+    point where you add new code is (instrumentation point)
+    added code (instrumentation code)
+* Static (SBI) vs Dynamic Binary Instrumentation (DBI)
+  - SBI uses binary rewriting techniques to permanently modify binaries on disk
+  - DBI monitors binaries as they execute and inserts new instr into the instr stream 
+    on the fly
+    
+      DBI                                  SBI
+    - slow                                 + fast
+    - depends on lib & tool                + stand-alone binary
+    + Transparently instruments libs       - Must explicitly instrument libraries 
+    + Handles dynamically gen code         - Dynamically gen code unsupported
+    + Can dynamically attach/detach        - Instruments entire execution
+    + No need for disassembly              - Prone to disassembly errors
+    + Transparent, no need to modify bin   - Error-prone binary rewriting
+    + No symbols needed                    - Symbols preffered to minimize errors
 
+# Static Binary Instrumentation
+
+* int 3
+  - software interrupt that user-space programs like SBI libraries or debuggers can catch
+    in form of a SIGTRAP signal delivered by the OS.
+  - instr is 1 byte long (no worry about instr overwriting)
+  - Doesn't work for programs that are already being debugged, as int3 for breakpoints
+* Trampoline Approach
+  - Copies all of the original code and instruments this copied code
+  - Uses jmp instrs (trampolines) to redirect the original code to the instrumented copy
+ ___________________
+|                   |
+| Executable header |
+|___________________|
+|                   |
+|  Program headers  |
+|___________________|
+|       .text       |
+| <f1>:             |
+|   jmp f1_copy     |
+|   ; junk bytes    |
+| <f2>:             |
+|   jmp f2_copy     |
+|___________________|
+|                   |
+|       .data       |
+|___________________|
+|   .text.instrum   |
+| <f1_copy>:        |
+|   ; nop bytes     |
+|   test edi, edi   |
+|   ; nop bytes     |
+|   xor eax, eax    |
+|   call f2_copy    |   <hook_ret>:
+| _ret:             |     ; save state
+|   call hook_ret  --->   ...
+|   ret             |     ; restore state
+|                   |     ret
+| <f2_copy>:        |
+|   ...             |
+|___________________|
+|                   |
+|  Section headers  |
+|___________________|
+ Instrumented Binary
+
+* When instrumenting a binary with trampoline approach, copies of all the original 
+  functions are created and are placed in a new code section (.text.instrum) and overwrites
+  the first instruction of each original func with a jmp trampoline that jumps to the 
+  corresponding copied func. 
+  
+# Trampoline Control Flow
 
 
 
