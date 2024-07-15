@@ -31,6 +31,9 @@ Sections:
   - Injecting Code Section
   - Calling Injected Code
 8. Customizing Disassembly
+9. Binary Instrumentation
+  - Static Binary Instrumentation
+  - Dynamic Binary Instrumentation
 
 Links To Documentation:
 * elf format   https://refspecs.linuxfoundation.org/elf/elf.pdf
@@ -635,7 +638,7 @@ Disassembly of a .plt section
     + Transparent, no need to modify bin   - Error-prone binary rewriting
     + No symbols needed                    - Symbols preffered to minimize errors
 
-# Static Binary Instrumentation
+# Static Binary Instrumentation (SBI)
 
 * int 3
   - software interrupt that user-space programs like SBI libraries or debuggers can catch
@@ -645,48 +648,145 @@ Disassembly of a .plt section
 * Trampoline Approach
   - Copies all of the original code and instruments this copied code
   - Uses jmp instrs (trampolines) to redirect the original code to the instrumented copy
- ___________________
-|                   |
-| Executable header |
-|___________________|
-|                   |
-|  Program headers  |
-|___________________|
-|       .text       |
-| <f1>:             |
-|   jmp f1_copy     |
-|   ; junk bytes    |
-| <f2>:             |
-|   jmp f2_copy     |
-|___________________|
-|                   |
-|       .data       |
-|___________________|
-|   .text.instrum   |
-| <f1_copy>:        |
-|   ; nop bytes     |
-|   test edi, edi   |
-|   ; nop bytes     |
-|   xor eax, eax    |
-|   call f2_copy    |   <hook_ret>:
-| _ret:             |     ; save state
-|   call hook_ret  --->   ...
-|   ret             |     ; restore state
-|                   |     ret
-| <f2_copy>:        |
-|   ...             |
-|___________________|
-|                   |
-|  Section headers  |
-|___________________|
- Instrumented Binary
+   ___________________
+  |                   |
+  | Executable header |
+  |___________________|
+  |                   |
+  |  Program headers  |
+  |___________________|
+  |       .text       |
+  | <f1>:             |
+1️⃣️|   jmp f1_copy     |
+2️⃣️|   ; junk bytes    |
+  | <f2>:             |
+  |   jmp f2_copy     |
+  |___________________|
+  |                   |
+  |       .data       |
+  |___________________|
+  |   .text.instrum   |
+  | <f1_copy>:        |
+3️⃣️|   ; nop bytes     |
+  |   test edi, edi   |
+4️⃣️|   jne _ret        |
+  |   ; nop bytes     |
+  |   xor eax, eax    |     __________________
+5️⃣️|   call f2_copy    |    |<hook_ret>:       |
+  | _ret:             |    |  ; save state    | 7️⃣️
+6️⃣️|   call hook_ret  --->  |  ...             |
+  |   ret             |    |  ; restore state | 8️⃣️
+  |                   |    |  ret             |
+  | <f2_copy>:        |    |__________________|
+  |   ...             |     Instrumentation 
+  |___________________|     code (shared lib)
+  |                   |
+  |  Section headers  |
+  |___________________|
+   Instrumented Binary
 
 * When instrumenting a binary with trampoline approach, copies of all the original 
   functions are created and are placed in a new code section (.text.instrum) and overwrites
   the first instruction of each original func with a jmp trampoline that jumps to the 
   corresponding copied func. 
   
-# Trampoline Control Flow
+(SBI) Trampoline Control Flow
+  - 1️⃣️ As soon as f1 is called, the trampoline jmps to f1_copy (instrumented version)
+  - 2️⃣️ jmp may overwrite following instr to junk bytes. However not executed
+  - 3️⃣️ nop instr inserted at every possible instrumentation point in f1_copy. 
+       That way, to instrument an instr, overwrite the nop instr at the pt with jmp or
+       call to a chunk of instrumentation code
+  - 4️⃣️ Replaces all 2-byte relative jmp instr which have 8-bit offset with a corresponding
+       5-byte version that has a 32 bit offset. This is required as I shift code around in 
+       f1_copy, the offset between jmp intrs and targets may become too large to encode 
+       in 8 bits
+  - 5️⃣️ Rewrites direct calls such as f2 so it targets instrumented func
+  - 6️⃣️ Now assume I instrument every ret instr. To do this SBI overwrites the nop instr 
+       reserved for this puspose with a jmp or call to instrumentation code.
+  - 7️⃣️ First saves the state (register contents)
+  - 8️⃣️ Restores the saved state 
+  
+* Handling Indirect Control Flow
+  - Because indirect controlstr target dynamically computed addrs, no reliable way for
+    SBI to statically redirect them.
+  - Trampoline approach allows indirect control transfers to flow to original, 
+    uninstrumented code and uses trampolines placed in the original code to intercept and
+    redirect the control flow back to the instrumented code. 
+     _______________            ______________________________
+    |.text          |          |.data                         |
+    | <f1>:         |        +--  jmptab: f1_case1  <-----------+
+    |  jmp f1_copy  |        | |          f1_case2            | |
+    |  ...          |        | |______________________________| |
+    |               |        | |.text                         | |
+    | <f2>:  <--------+      | | <f1>:                        | |
+  +--- jmp f2_copy  | |      | |  jmp f1_copy                 | |
+  | |  ...          | |      | |  ; junk bytes                | |
+  | |_______________| |      +--> f1_case1: ; switch case1    | |
+  | |_______________| |        |  f1_case2: ; switch case2    | |
+  | |.text.instrum  | |        |______________________________| |
+  | | <f1_copy>:    | |        |.text.instrum                 | |
+  | |  mov rax, f2  | |        | <f1_copy>:                   | |
+  | |  call rax  -----+        |  ...                         | |
+  | |  ret          |          |  jmp QWORD PTR [rax*8+jmptab] -+
+  | |               |          |  ; switch case 1             |
+  +-> <f2_copy>:    |          |  ; switch case 2             |
+    |  ...          |          |  ret                         |
+    |_______________|          |______________________________|
+      indirect call             indirect jump (switch) using jmp table
+    
+  - By default the addrs stored in jump table all point to the original code. 
+    Thus the indirect jmp ends up in the original func with no trampoline. SBI must
+    patch the jmp table or place trampoline at every switch case in the original code
+
+# Dynamic Binary Instrumentation (DBI)
+
+* DBI engines monitor binaries (processes) as they execute and instrument the instr stream
+  PIN (ex of DBI platform). The DBI tools implement with Pin are Pinttools which are 
+  chared libraries written in C/C++ using Pin API. Pintools have 2 different types of funcs
+  - Instrumentation routines
+    tell Pin which instrumentation code to add and where. install callbacks to analysis 
+    routines
+  - Analysis routines
+    contain the actual instrumentation code and called every time an instrumented code runs
+
+* Basic Block 
+  - A sequence of consecutive instr in a program that have a single entry point, single
+    exit point, and no internal branches out except at the exit
+* Trace
+  - A sequence of instr with 1 entry point. Typically ends with unconditional branch.
+    essentially a sequence of basic blocks that form a continous path through program's
+    execution flow. (Determined by Pin)
+    
+# Profiling with Pin
+* Profiling records stats about program's execution (counts num of executed instr & num of 
+  basic blocks, funcs, syscalls)
+* Pin observes the program starting from first instr so profiler sees not only application
+  code but also instr executed by dynamic loader and shared libs.
+
+* PIN_InitSymbols() 
+  - read the application's symbol tables
+* PIN_Init
+  - initializes Pin and processes Pin's cmd line options & Pintool's options with KNOBs
+* Registering the instrumentation routines 
+  - IMG_AddInstrumentFunction: registers callback every time a new image (dynamically 
+    loaded module, shared lib) is loaded or unloaded
+  - TRACE_AddInstrumentFunction: registers callback every trace 
+  - INS_AddInstrumentFunction: registers callback every instr
+* Registering Syscall Functions
+  - PIN_AddSyscallEntryFunction: registers callback when syscall is entered
+  - PIN_AddSyscallExitFunction: registers callback when syscall exits
+* Registering Fini Function
+  - PIN_AddFiniFunction: registers callback when application exits or detach PIN
+* PIN_StartProgram
+  - starts the application running. No longer possible to register callbacks. never returns
+
+
+
+
+
+
+
+
 
 
 
