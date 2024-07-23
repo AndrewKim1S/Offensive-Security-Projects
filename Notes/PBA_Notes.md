@@ -2,8 +2,8 @@
 ###############################################################################
 #                         Practical Binary Analysis                           #
 #                         Start Date: June 21, 2024                           #
-#                         End Date:                                           #
-#                            Status: In Progress                              #
+#                         End Date: July 17, 2024                             #
+#                            Status: Complete                                 #
 ###############################################################################
 General:
 * Environment: Ubuntu 16, gcc 5.6 
@@ -34,6 +34,7 @@ Sections:
 9. Binary Instrumentation
   - Static Binary Instrumentation
   - Dynamic Binary Instrumentation
+10. Principles of Dynamic Taint Analysis
 
 Links To Documentation:
 * elf format   https://refspecs.linuxfoundation.org/elf/elf.pdf
@@ -70,11 +71,13 @@ Links To Documentation:
   - Static Libraries 
     - They are merged into the binary executable, allowing any references to them to 
       be resolved entirely
-  - Dynamic (shared) Libraries are shared in memory among all programs that run on the system.
-    - Rather than copying the library into the binary, they are loaded into memory only once and any
-      binary that wants to use it must use this shared copy. This addr is not known during Linking so
-      the linker leaves symbolic references to these libraries even in the final exec. 
-      They are resolved when the binary is actually loaded into memory.
+  - Dynamic (shared) Libraries are shared in memory among all programs that run on the
+    system.
+    - Rather than copying the library into the binary, they are loaded into memory only
+      once and any binary that wants to use it must use this shared copy. This addr is 
+      not known during Linking so the linker leaves symbolic references to these 
+      libraries even in the final exec. They are resolved when the binary is actually 
+      loaded into memory.
 
 # Symbols and Stripped Binaries
 * When compiling a program, compilers emit symbols which keep track of funcs & vars
@@ -741,8 +744,8 @@ Disassembly of a .plt section
 # Dynamic Binary Instrumentation (DBI)
 
 * DBI engines monitor binaries (processes) as they execute and instrument the instr stream
-  PIN (ex of DBI platform). The DBI tools implement with Pin are Pinttools which are 
-  chared libraries written in C/C++ using Pin API. Pintools have 2 different types of funcs
+  PIN (ex of DBI platform). The DBI tools implement with Pin are Pintools which are 
+  shared libraries written in C/C++ using Pin API. Pintools have 2 different types of funcs
   - Instrumentation routines
     tell Pin which instrumentation code to add and where. install callbacks to analysis 
     routines
@@ -760,8 +763,33 @@ Disassembly of a .plt section
 # Profiling with Pin
 * Profiling records stats about program's execution (counts num of executed instr & num of 
   basic blocks, funcs, syscalls)
+
+# Automatic Binary Unpacking with Pin
+* Executable packers are programs that take a bin and "pack" that binary's code & data
+  sections together into a compressed or encrypted data region, producing packed executable
+  
+=       Original bin            Packed bin             Unpacked bin
+=       |          |           |           |           |          |
+=     +--- Header  |         +--- Header   |         +--- Header  |
+=     | |__________|    ent  | |___________|         | |__________|
+= ent | |          |    pt   | | Bootstrap |         | | Bootstrap|
+= pt  | |   Data   |         +-->  code    |         +-->  code   |
+=     | |__________|           |___________|         +--__________|
+=     | |          |           |   Packed  |         | | Unpacked |
+=     +-->  Code   |           |code + data|     Jmp | |   data   |
+=       |__________|           |___________|     OEP | |__________|
+=                                                    | | Unpacked |
+=                                                    +-->  code   |
+=                                                      |__________|
+
+* When load and execute the packd bin, the bootstrap code extracts the original code & data
+  into memory and then transfers control to the OEP (original entry point). Resumes exec
+  normally
+
+# Pin Specifics
 * Pin observes the program starting from first instr so profiler sees not only application
   code but also instr executed by dynamic loader and shared libs.
+* Pin can be run from the start with pin engine or can attach pintool to a running app
 
 * PIN_InitSymbols() 
   - read the application's symbol tables
@@ -780,17 +808,33 @@ Disassembly of a .plt section
 * PIN_StartProgram
   - starts the application running. No longer possible to register callbacks. never returns
 
+##################### Principles of Dynamic Taint Analysis ####################
+
+* Dynamic Taint Analysis (DTA)
+  - program analysis technique to determine the influence that a selected program state
+    has on other parts of the program state
+  - Taint Sources: program locations where you select data that's interesting to track
+  - Taint Sinks: programl locations you check to see whether they can be influenced by
+    tainted data
+  - Tracking Taint Propogation: Determining how taint propogates from the input operands 
+    of an instr to its output operands. Specified by a taint policy
+* DTA design factors
+  - Taint Granularity: bit, byte, or word granular
+  - Taint Colors: multiple taint colors for each taint source
+* Shadow memory: region of virtual memory allocated by DTA engine to keep track of memory
+  tainting and CPU tainting.
+
+############### Practical Dynamic Taint Analysis w/ LIBDFT ####################
 
 
+##################### Principles of Symbolic Execution ########################
 
-
-
-
-
-
-
-
-
+* Symbolic execution tracks metadata about the program state
+  - Symbex executes or emulates application with symbolic values instead of the concrete
+    values used when normally run a program
+* Symbolic State
+  - symbolic expressions: 
+  - path constraint, mapping of variables to symbolic expressions
 
 
 
