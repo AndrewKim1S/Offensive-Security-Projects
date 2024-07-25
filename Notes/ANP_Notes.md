@@ -208,10 +208,39 @@ General:
 
 * Passive Network Capture can take place either on the network by tapping the traffic as it
   passes in some way or by sniffing directly on either the client or server host
+* Tools such as Wireshark
   
+# Alternative Passive Capture Techniques
+* System Call Tracing
+  - Can use strace to monitor system calls
+  - $ strace -e trace=network,read,write /path/to/app args
+* Monitoring Network Connections with Dtrace
+  - Allos me to set system-wide probes on special trace providers, including system calls
+  
+# Active Network Traffic Capture
 
+=  Client Application <----> Man in the middle proxy <----> Server Application
 
+* Must reroute the appllication's traffic through my active capture system
 
+# Network Proxies
+* Common way to perform man-in-the-middle attack on network traffic is to force application
+  to communicate through a proxy service
+  
+* Port-Forwarding Proxy
+  - Set up a listening server (TCP or UDP) & wait for a new connection. When new connection
+    is made to the proxy server, it will open a forwarding connection to the real service
+    & logically connect the two
+    
+=                     __________________________________________
+=                    | Listening           TCP            TCP   |
+= Client App <-TCP-> |    TCP    <-> port-forwarding <-> client | <-TCP-> Server App
+=                    |  Service           proxy                 |
+=                    |__________________________________________|
+
+* Redirecting Traffic to Proxy
+  - Web browser: to capture specific request, instead of URL of the form
+    http://www.domain.com/resource  ->  http://localhost:localport/resource
 
 
 
