@@ -6,7 +6,13 @@
 #                            Status: In-Progress                              #
 ###############################################################################
 General:
-1. Network Basics
+  1. Network Basics
+    * IP Addresses                     * DHCP
+    * NAT                              * IP
+    * Ports                            * TCP
+    * UDP                              * OSI Layers
+  2. Subnetting and CIDR Notation
+    * 
 
 ############################## Network Basics #################################
 
@@ -25,26 +31,156 @@ General:
     10.0.0.0    - 10.255.255.255
     172.16.0.0  - 172.16.255.255
     
-* DHCP (Dynamic Host Configuration Protocol)
+# DHCP (Dynamic Host Configuration Protocol)
   - Assigns IP addrs dynamically. When device is connected to LAN, it requests
     private IP addr by sending request to DHCP server. It then assigns IP addr 
     to that system for a fixed length of time (lease)
     
-* NAT (Network Address Translation)
+# NAT (Network Address Translation)
   - Private IP addrs are translated to public IP addrs that can be routed 
     through internet. 
     
-* Ports
+# Ports
   - A sub-addr for service.  
 =     Port Number   Protocol   Port Type
 =         21          FTP       TCP, UDP
 =         22          SSH       TCP, UDP
 =         23         Telnet     TCP, UDP
 =         25          SMTP      TCP, UDP
-=         
-    
-    
-    
-    
-    
-    
+=         53          DNS       TCP, UDP
+=       67/68         DHCP        UDP
+=         80          HTTP      TCP, UDP
+=        110          POP3      TCP, UDP
+=        143          IMAP        TCP
+=      161/162        SNMP      TCP, UDP
+=        389          LDAP      TCP, UDP
+=        427          SLP       TCP, UDP
+=        443         HTTPS      TCP, UDP
+=        445        SMB/CIFS      TCP
+=        548          AFP         TCP
+=       3389          ROP       TCP, UDP       
+  - netcat can be used 
+
+# IP (Internet Protocol)
+* Protocol used to define the src and dst IP addr of a packet as it traverses
+  the internet. Often used in conjunction with other protocols like TCP
+ 
+= IP packet header
+=     0 _____________ 1 _____________ 2 _____________ 3 _____________  <+
+=   0|_ Ver _ |  IHL  | Type of Serv  | ________ Total Length _______|  |
+=   4|_________ Identification ______ | flags | __ Fragment Offset __|  |
+=   8|______ TTL ____ | _ Protocol __ | ______ Header Checksum ______|  | IHL
+=  12|________________________ Source Address _______________________|  |
+=  16|_____________________ Destination Address _____________________|  |
+=  20|_______ IP Option (variable length, optional not common) ______| <+
+
+  - Version: Defines the version of IP, (v4 or v6)
+  - IHL: header length
+  - ToS: type of service of this packet
+  - Total Length: Total length of IP datagram
+  - Identification: unique id
+  - IP flags:
+  - Fragment Offset: where packets should be reassembled 
+  - TTL: time to live - how many hops across the internet before packet expires
+  - Protocol: what protocol is being used
+  - Header Checksum: error checking field
+  - Source/Destination: src & dst ip addr
+  - Options & padding
+
+# TCP (Transmission Control Protocol)
+
+= TCP header
+=    0 ______________ 8 _____________ 16 ____________ 24 ___________ 32    
+=    |__________ Source Port ________ | _____ Destination Port ______|
+=    |________________________ Sequence Number ______________________|
+=    |____________________ Acknowledgement Number ___________________|
+=    | Dt off | Rsrvd | ___ flags ___ | ________ Window Size ________|
+=    |___________ Checksum __________ | _______ Urgent Pointer ______|
+=    |____________________ Options __________________ | __ Padding __|
+
+  - Source/Destination Port: src & dst ports
+  - Sequence Number: Ensure packets are arranged in proper sequence
+  - Acknowledgement Number: Echo of Sequence # sent back by receiving system
+  - Flags
+    SYN: opening of new connection
+    FIN: normal "soft closing of connection
+    ACK: acknowledgement of a packet
+    RST: hard-close of connection to say packet arrived at wrong port/ip
+    URG: data is urgent
+    PSH: push data past the buffer to the application
+  - Window Size: communicate size of window that the TCP stack has not buffer 
+    packets
+  - Checksum: error checking field
+  - URG pointer: points to the last byte of the sequence # of urgent data
+  
+* TCP Three-Way Handshake
+  - Every TCP connection starts with 3-way handshake
+  1. Client sending packet with SYN flag  
+  2. Server respond packet with SYN & ACK flags
+  3. Client sending packet with ACK flag
+ 
+# UDP (User Datagram Protocol)
+* Connectionless protocol (doesn't require a connection like 3-way handshake)
+  Sends packets and forgets about them
+ 
+# OSI model
+
+=  OSI Layers                               Attacks
+= _________________________________________________________
+=  Application ---------------------------> Exploit
+=    end user layer
+=    HTTP, FTP, IRC, SSH, DNS
+=  Presentation --------------------------> Phishing
+=    syntax layer
+=    SSL, SSH, IMAP, FTP, MPEG, JPEG
+=  Session -------------------------------> Hijacking
+=    synch & send to port
+=    API's sockets, WinSock
+=  Transport -----------------------------> Reconnaissance
+=    end-to-end encryption
+=    TCP, UDP
+=  Network -------------------------------> MITM
+=    packets
+=    IP, ICMP, IPSec, IGMP
+=  Data Link -----------------------------> Spoofing
+=    Frames
+=    Ethernet, PPP, Switch, Bridge
+=  Physical ------------------------------> Sniffing
+=    Fiber, Hubs
+
+######################## Subnetting and CIDR Notation #########################
+
+# Sub-nets
+* A network within a network, namely a Class A, B, or C. Subnets are created
+  by using one or more of the host bits to extend the network ID 
+  - Class A networks has a 8-bit network ID
+  - Class B networks has standard 16-bit network ID
+  - Class C networks has standard 24-bit network ID
+  
+=  Class   Leading   Size of   Number of   Addrs per    Start       End 
+=           Bits     Network    Networks    Network     Addr        Addr
+=  ____________________________________________________________________________
+=    A       0          8        128     16,777,216   0.0.0.0    127.255.255.255
+=    B       10        16      16,384      65,536    128.0.0.0   191.255.255.255
+=    C      110        24     2,097,152     256      192.0.0.0   223.255.255.255
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
