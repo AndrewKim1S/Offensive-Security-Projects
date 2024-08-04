@@ -12,7 +12,11 @@ General:
     * Ports                            * TCP
     * UDP                              * OSI Layers
   2. Subnetting and CIDR Notation
-    * 
+    * Subnet                           * Subnet Masks
+    * CIDR
+  3. Network Analysis
+  4. Linux Firewalls
+    * Iptables
 
 ############################## Network Basics #################################
 
@@ -164,10 +168,50 @@ General:
 =    B       10        16      16,384      65,536    128.0.0.0   191.255.255.255
 =    C      110        24     2,097,152     256      192.0.0.0   223.255.255.255
 
+* A network mask, is a binary mask applied to an IP address to determine 
+  whether two IP addrs are in the same subnet. Works by applying binary AND
+  operations between the IP addr and the mask
+  - Class A subnet mask: 255 0   0   0
+  - Class B subnet mask: 255 255 0   0
+  - Class C subnet mask: 255 255 255 0
+  
+# Sub-Net Masks
+* when subnet mask bit is set to one. it is part of the network. Bit marked
+  zero is part of host ID.
+  Subnet mask: 255.255.255.0
+               11111111 11111111 11111111 00000000
+  IP Address:  192.168.1.5
+               11000000 10101000 00000001 00000101
+  Network Prefix: 192.168.1.0
+               11000000 10101000 00000001 00000000
 
+# CIDR Notation (Classless Inter-Domain Routing)
+* A way of representing IP addr and network mask associated with it.
+  Specificies IP addr / and a decimal # like 24, where it represents the number
+  of bits in the network mask
 
+=  Example
+=  Class C network: 192.168.1.0
+=  Class C Subnet Mask: 255.255.255.0 11111111 11111111 11111111 00000000
+=  254 host addrs, 1 broadcast, 1 network
+=  Create 5 different networks with no more than 30 hosts per network
+=  To create 5 networks, 2^3 or 8 networks. or 11100000. 
+=  Means 2^5 -2 host addrs per subnet
+=  subnet mask: 255.255.255.224
 
+############################# Network Analysis ################################
 
+############################## Linux Firewalls ################################
+* Firewall is a subsystem on a computer that blocks certain network traffic 
+  from going into or out of a computer. Can be software or hardware based.
+  
+# Iptables
+* Firewall utility that uses teh cmd line to setup policy chains to allow or 
+  block traffic. When there is a connection, iptables looks for a rule to match
+  the type of traffic. If none is found, it falls back to default action
+* Tables
+* Chains
+* Targets
 
 
 
