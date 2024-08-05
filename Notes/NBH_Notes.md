@@ -16,7 +16,9 @@ General:
     * CIDR
   3. Network Analysis
   4. Linux Firewalls
-    * Iptables
+    * Iptables                         * Iptables Commands
+  5. Wi-Fi Networks
+    * Terminology                      * 
 
 ############################## Network Basics #################################
 
@@ -200,22 +202,71 @@ General:
 =  subnet mask: 255.255.255.224
 
 ############################# Network Analysis ################################
+* Essentially Wireshark and tcpdump
 
 ############################## Linux Firewalls ################################
 * Firewall is a subsystem on a computer that blocks certain network traffic 
   from going into or out of a computer. Can be software or hardware based.
   
 # Iptables
-* Firewall utility that uses teh cmd line to setup policy chains to allow or 
+* Firewall utility that uses cmd line to setup policy chains to allow or 
   block traffic. When there is a connection, iptables looks for a rule to match
   the type of traffic. If none is found, it falls back to default action
 * Tables
+  - An iptables construct that defines categories of functionality (FILTER, 
+    NAT, MANGLE, and RAW)
+  - FILTER: default table 
+  - NAT: rewrite the src or dst addr of packets
+  - MANGLE: packet alteration
+  - RAW: configuring exemptions from connection tracking 
 * Chains
+  - Each table has own chains which are lists of rules within a table (INPUT,
+    OUTPUT, FORWARD)
+  - INPUT: for packets destined for the local system
+  - OUTPUT: for packets leaving the local system
+  - FORWARD: for packets being routed through the local system
+  - MATCH: when ppacket meets the condition established by the rule. iptables
+      then processes the packet according to the action in the rule
 * Targets
+  - iptables support a set targets that trigger an action when the packet meets
+    the condition of the rule. ACCEPT (allow packet to pass), DROP (drop the 
+    packet), LOG, REJECT (drop packet and send back error), RETURN
 
+# Iptables Commands
+  // List default policy on chains
+  $ sudo iptables -L
+  // Block any packets from 192.168.1.102
+  $ sudo iptables -A INPUT -s 192.168.1.102 -j DROP
+  // Block entire subnetwork with CIDR notation
+  $ sudo iptables -A INPUT -s 192.168.1.0/24 -j DROP
+  // Block access to websites
+  $ sudo iptables -A OUTPUT -p tcp --dport 80 -j DROP
+  $ sudo iptables -A OUTPUT -p tcp --dport 443 -j DROP
+  // Flush iptables and start over
+  $ sudo iptables -F
 
+############################### Wi-Fi Networks ################################
 
+# Terminology
+* AP         access point of place where clients connect to Wi-Fi
+* PSK        Pre-Shared-Key the password used to authenticate to the AP
+* SSID       name used to identify the AP
+* ESSID      Extended Service Set Identifier - same as SSID but can be user for 
+             multiple APs in a wireless LAN
+* BSSID      Basic Service Set Identifier, the unique id for every AP
+* Channels   Wi-Fi operates on channels 1-14 but 1-11 in US
+* Power      closer to AP stronger the signal
+* Security   security protocol to authenticate & encrypt Wi-Fi traffic
+* Modes      Wi-Fi can be master, managed, monitor. APs master, wireless 
+             network interfaces & hackers, monitor mode
+* Range      100m up to 20 miles
+* Frequency  2.4 of 5GHZ
 
+  // Viewing Wireless Interfaces
+  $ ip addr
+  // 
+
+############################ Bluetooth Networks ###############################
 
 
 
