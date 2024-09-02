@@ -502,27 +502,28 @@ password: RdUzprHKSm
 Level 2
 Exploit:
 
+utumno2 binary requires argc to be 0 in order to run
+  - Work around is to execute utumno2 bin through execve in another bin and set
+    argc to 0
+
+move (ebp+0xc+0x28) 10th ptr - 10th env var as the src string
+ ____________  ebp
+|___ argc ___| ebp 0x4
+|__ argv[0] _|  
+|___ ... ____| // no args in our example
+|__ argv[n] _|
+|___ NULL ___| ebp 0x8
+|__ env[0] __| ebp 0xc
+|___ ... ____|
+|__ env[n] __|
+|___ NULL ___|
+
+There is a strcpy where src is the 10th env var when there are no args
+
 password:
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+###############################################################################
 
 pwnable.kr 
 

