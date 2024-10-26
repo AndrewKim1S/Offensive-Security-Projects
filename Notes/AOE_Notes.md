@@ -426,6 +426,7 @@ Sections:
 
 
 ############################## Return to libc #################################
+https://css.csail.mit.edu/6.858/2014/readings/return-to-libc.pdf
 * libc is a standard C library that contains various basic functions like printf and exit. These
   functions are shared so any program that uses the printf() function directs execution into the 
   appropriate location in libc.
