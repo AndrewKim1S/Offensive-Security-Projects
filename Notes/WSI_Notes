@@ -1,0 +1,86 @@
+###############################################################################
+#                        Windows Security Internals                           #
+#                         Start Date: Jan 1, 2025                             #
+#                         End Date:                                           #
+#                            Status: In-Progress                              #
+###############################################################################
+General:
+1. Powershell
+2. Windows Kernel
+
+
+################################## Powershell #################################
+Types, Operators, Vars
+	__________________________________________
+	Basic Powershell Types
+	Types        .NET type 
+	int          System.Int32
+	long         System.Int64
+	string       System.String
+	double       System.Double
+	bool         System.Boolean
+	array        System.Object[]
+	hashtable    System.Collections.Hashtable
+	__________________________________________
+	Common Operators
+	Operator   Name
+	+          Addition
+	-          Subtraction
+	*          Multiplication
+	/          Division
+	%          Modulo
+	[]         Index
+	-f         String formatter
+	-band      bitwise and 
+	-bor       bitwise or 
+	-bxor      bitwise xor
+	-bnot      bitwise not 
+	-and       boolean and 
+	-or        boolean or 
+	-not       boolean not 
+	- eq       equals 
+	-ne        not equals
+	-lt        less than 
+	-gt        greater than 
+	__________________________________________
+	Predefined Variables
+	$null  NULL value
+	$pwd   current working directory
+	$pid   process ID of shell
+	$env   accesses the process env 
+
+
+Commands
+
+	Get-Command used to enumerate all the commands availible.
+	> Get-Command -Name <cmd name>
+	> Get-Command -Module <module name> -Name <cmd name>
+
+	Get-Help
+	> Get-Help <cmd name>
+	> Get-Help <cmd name> -Parameter <param name>
+	> Get-Help <cmd name> -Examples
+
+
+Functions
+
+	Define function
+	> function <func name> {
+			param(
+				[string]$Name = "",
+				$Value
+			)
+			return "$Name with value $Value"
+	}
+
+	Use function
+	> <func name> <param>
+
+
+script block 
+	A small block of code without defining a function
+	& is the Invoke-Command command 
+	> $script = { Write-Output "Hello" }
+	> & $script
+
+
