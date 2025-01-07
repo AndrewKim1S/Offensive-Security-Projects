@@ -1,8 +1,5 @@
 ###############################################################################
-#                            Evasive Malware                                  #
-#                         Start Date: Jan 2 2024                              #
-#                         End Date:                                           #
-#                         Status:                                             #
+#                      Windows Hacking & PE file format                       #
 ###############################################################################
 
 
@@ -93,18 +90,128 @@ Process Internals
 	- EPROCESS structs consist of a doubly linked list 
 
 	Process Environment Blocks
+	https://learn.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-peb_ldr_data?redirectedfrom=MSDN
+
 		- The PEB memory struct contains info about a running process that the kernel
 			needs to communicate with that process & info for icp 
 		- Each running process has its own PEB that's stored in user-mode addr space 
 			inside that process memory 
+		- Exists in User address space & available for every process at a fixed addr
+			in memory. 
+
+			typedef struct _PEB {
+				BYTE                          Reserved1[2];
+				BYTE                          BeingDebugged;
+				BYTE                          Reserved2[1];
+				PVOID                         Reserved3[2];
+				PPEB_LDR_DATA                 Ldr;
+				PRTL_USER_PROCESS_PARAMETERS  ProcessParameters;
+				PVOID                         Reserved4[3];
+				PVOID                         AtlThunkSListPtr;
+				PVOID                         Reserved5;
+				ULONG                         Reserved6;
+				PVOID                         Reserved7;
+				ULONG                         Reserved8;
+				ULONG                         AtlThunkSListPtr32;
+				PVOID                         Reserved9[45];
+				BYTE                          Reserved10[96];
+				PPS_POST_PROCESS_INIT_ROUTINE PostProcessInitRoutine;
+				BYTE                          Reserved11[128];
+				PVOID                         Reserved12[1];
+				ULONG                         SessionId;
+			} PEB, *PPEB;
+
+			typedef struct _PEB_LDR_DATA {
+				BYTE       Reserved1[8];
+				PVOID      Reserved2[3];
+				LIST_ENTRY InMemoryOrderModuleList;
+			} PEB_LDR_DATA, *PPEB_LDR_DATA;
+
+		- From the PPEB_LDR_DATA Ldr, the LIST_ENTRY InMemoryOrderModuleList is a 
+			doubly linked list that contains the loaded modules for the process 
+			Each item in the list is a ptr to an LDR_DATA_TABLE_ENTRY struct. This 
+			can give us the specific dlls.
+			- Can be used to access kernel32.dll to access functions and call any 
+				Windows API function
+
+			typedef struct _LDR_DATA_TABLE_ENTRY {
+					PVOID Reserved1[2];
+					LIST_ENTRY InMemoryOrderLinks;
+					PVOID Reserved2[2];
+					PVOID DllBase;
+					PVOID EntryPoint;
+					PVOID Reserved3;
+					UNICODE_STRING FullDllName;
+					BYTE Reserved4[8];
+					PVOID Reserved5[3];
+					union {
+							ULONG CheckSum;
+							PVOID Reserved6;
+					};
+					ULONG TimeDateStamp;
+			} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
+
 
 	Thread Environment Blocks
 		- data struct that contains info for a process's running threads
 
 _______________________________________________________________________________
 PE File Format
-	Headers & Sections
-		- metadata, PE header 
+https://0xrick.github.io/win-internals/pe3/#a-dive-into-the-pe-file-format---pe-file-structure---part-2-dos-header-dos-stub-and-rich-header
+
+	DOS Header
+		- 64 byte long struct that exists at the start of the PE file
+
+		typedef struct _IMAGE_DOS_HEADER {      // DOS .EXE header
+			WORD   e_magic;                     // Magic number
+			WORD   e_cblp;                      // Bytes on last page of file
+			WORD   e_cp;                        // Pages in file
+			WORD   e_crlc;                      // Relocations
+			WORD   e_cparhdr;                   // Size of header in paragraphs
+			WORD   e_minalloc;                  // Minimum extra paragraphs needed
+			WORD   e_maxalloc;                  // Maximum extra paragraphs needed
+			WORD   e_ss;                        // Initial (relative) SS value
+			WORD   e_sp;                        // Initial SP value
+			WORD   e_csum;                      // Checksum
+			WORD   e_ip;                        // Initial IP value
+			WORD   e_cs;                        // Initial (relative) CS value
+			WORD   e_lfarlc;                    // File address of relocation table
+			WORD   e_ovno;                      // Overlay number
+			WORD   e_res[4];                    // Reserved words
+			WORD   e_oemid;                     // OEM identifier (for e_oeminfo)
+			WORD   e_oeminfo;                   // OEM information; e_oemid specific
+			WORD   e_res2[10];                  // Reserved words
+			LONG   e_lfanew;                    // File address of new exe header     <---- location of PE header 
+		} IMAGE_DOS_HEADER, *PIMAGE_DOS_HEADER;
+
+	DOS Stub
+		- is an MS-DOS program that prints error message saying that exe is not 
+			compatible with DOS then exits. Happens when the progr is loaded in MS-DOS
+
+	PE Header (Image_NT_Headers)
+		- Constains PE signature, FileHeader (number of sections code & data), 
+			machine type(x86, ARM), and exe or dll.
+
+			typedef struct _IMAGE_NT_HEADERS {
+					DWORD Signature;
+					IMAGE_FILE_HEADER FileHeader;
+					IMAGE_OPTIONAL_HEADER32 OptionalHeader;
+			} IMAGE_NT_HEADERS32,
+
+		- Optional Header has AddressOfEntryPoint, ImageBase, DataDirectory 
+			(info such as imported and exported functions)
+
+			typedef struct _IMAGE_OPTIONAL_HEADER {
+					DWORD   AddressOfEntryPoint;
+					DWORD   BaseOfCode;
+					DWORD   BaseOfData;
+					...
+
+					IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+			} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;
+
+
+	Sections
 		- section header which is metadata related to each of the file's sections
 		- .text, .rdata, .bss, .data, .rsrc, .idata (imports), .edata (exports)
 		- .idata contains info about functions that the PE file will import at runtime
@@ -115,6 +222,7 @@ PE File Format
 			programs exports have their own table export addr table
 		- In practice .edata & .idata sections are often contained in .rdata section
 
+_______________________________________________________________________________ 
 	Windows PE Loading Process
 		1. Windows creates a new EPROCESS data struct for application & assigns new pid
 		2. Windows initializes the virtual memory for the process, creates the PEB structure,
@@ -151,7 +259,7 @@ PE File Format
 											|    ...     |
 											+------------+
 
-	Each section in the PE file is individually mapped into memory, but it appears
-	expanded in virtual memory as there are often regions of memory between each
-	section
+	- Each section in the PE file is individually mapped into memory, but it appears
+		expanded in virtual memory as there are often regions of memory between each
+		section
 
