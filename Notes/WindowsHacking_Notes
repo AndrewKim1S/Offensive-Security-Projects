@@ -89,6 +89,20 @@ Process Internals
 		which is a struct that contains vital info about the process
 	- EPROCESS structs consist of a doubly linked list 
 
+	Thread Environment Block 
+			typedef struct _TEB {
+				PVOID Reserved1[12];
+				PPEB  ProcessEnvironmentBlock;
+				PVOID Reserved2[399];
+				BYTE  Reserved3[1952];
+				PVOID TlsSlots[64];
+				BYTE  Reserved4[8];
+				PVOID Reserved5[26];
+				PVOID ReservedForOle;
+				PVOID Reserved6[4];
+				PVOID TlsExpansionSlots;
+			} TEB, *PTEB;
+
 	Process Environment Blocks
 	https://learn.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-peb_ldr_data?redirectedfrom=MSDN
 
@@ -127,10 +141,17 @@ Process Internals
 				LIST_ENTRY InMemoryOrderModuleList;
 			} PEB_LDR_DATA, *PPEB_LDR_DATA;
 
+			typedef struct _LIST_ENTRY {
+				struct _LIST_ENTRY *Flink;
+				struct _LIST_ENTRY *Blink;
+			} LIST_ENTRY, *PLIST_ENTRY, PRLIST_ENTRY;
+
+
 		- From the PPEB_LDR_DATA Ldr, the LIST_ENTRY InMemoryOrderModuleList is a 
 			doubly linked list that contains the loaded modules for the process 
 			Each item in the list is a ptr to an LDR_DATA_TABLE_ENTRY struct. This 
 			can give us the specific dlls.
+			- The image exe <-> Ntdll.dll <-> kernerl32.dll 
 			- Can be used to access kernel32.dll to access functions and call any 
 				Windows API function
 
@@ -151,13 +172,11 @@ Process Internals
 					ULONG TimeDateStamp;
 			} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
 
-
-	Thread Environment Blocks
-		- data struct that contains info for a process's running threads
+	* PVOID is 4 bytes in 32 bit, 8 bytes in 64 bit
 
 _______________________________________________________________________________
 PE File Format
-https://0xrick.github.io/win-internals/pe3/#a-dive-into-the-pe-file-format---pe-file-structure---part-2-dos-header-dos-stub-and-rich-header
+https://tech-zealots.com/malware-analysis/pe-portable-executable-structure-malware-analysis-part-2/
 
 	DOS Header
 		- 64 byte long struct that exists at the start of the PE file
@@ -194,7 +213,7 @@ https://0xrick.github.io/win-internals/pe3/#a-dive-into-the-pe-file-format---pe-
 
 			typedef struct _IMAGE_NT_HEADERS {
 					DWORD Signature;
-					IMAGE_FILE_HEADER FileHeader;
+					IMAGE_FILE_HEADER FileHeader;			<-- always 20 bytes
 					IMAGE_OPTIONAL_HEADER32 OptionalHeader;
 			} IMAGE_NT_HEADERS32,
 
@@ -207,8 +226,30 @@ https://0xrick.github.io/win-internals/pe3/#a-dive-into-the-pe-file-format---pe-
 					DWORD   BaseOfData;
 					...
 
-					IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+					IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];   (also 0x78 from PE header)
 			} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;
+
+		- Data Directory
+			typedef struct _IMAGE_DATA_DIRECTORY {
+				DWORD VirtualAddress;
+				DWORD Size;
+			} IMAGE_DATA_DIRECTORY, *PIMAGE_DATA_DIRECTORY;
+
+			#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory
+			#define IMAGE_DIRECTORY_ENTRY_IMPORT          1   // Import Directory
+			#define IMAGE_DIRECTORY_ENTRY_RESOURCE        2   // Resource Directory
+			#define IMAGE_DIRECTORY_ENTRY_EXCEPTION       3   // Exception Directory
+			#define IMAGE_DIRECTORY_ENTRY_SECURITY        4   // Security Directory
+			#define IMAGE_DIRECTORY_ENTRY_BASERELOC       5   // Base Relocation Table
+			#define IMAGE_DIRECTORY_ENTRY_DEBUG           6   // Debug Directory
+			#define IMAGE_DIRECTORY_ENTRY_ARCHITECTURE    7   // Architecture Specific Data
+			#define IMAGE_DIRECTORY_ENTRY_GLOBALPTR       8   // RVA of GP
+			#define IMAGE_DIRECTORY_ENTRY_TLS             9   // TLS Directory
+			#define IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG    10   // Load Configuration Directory
+			#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers
+			#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
+			#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
+			#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor
 
 
 	Sections
