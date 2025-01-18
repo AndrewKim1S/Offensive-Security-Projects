@@ -82,7 +82,7 @@ Windows Native API: lower level API
 	- Windows API -> Windows Native API -> kernel 
 
 _______________________________________________________________________________
-Process Internals
+Process Internals 
 	- processes are represented in kernel addr space as objects called EPROCESS structs
 	- Each process has its own EPROCESS structure that contains ptrs to elements
 		like list of handles the process has open, Process Environment Block (PEB)
@@ -173,6 +173,8 @@ Process Internals
 			} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
 
 	* PVOID is 4 bytes in 32 bit, 8 bytes in 64 bit
+	* Use WinDBG to confirm actual locations
+	* fs and gs segmented registers
 
 _______________________________________________________________________________
 PE File Format
@@ -229,7 +231,8 @@ https://tech-zealots.com/malware-analysis/pe-portable-executable-structure-malwa
 					IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];   (also 0x78 from PE header)
 			} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;
 
-		- Data Directory
+		- At the end of OptionalHeader struct there are IMAGE_DATA_DIRECTORY structures (16)
+		- To get to certain directory follow the VirtualAddress field 
 			typedef struct _IMAGE_DATA_DIRECTORY {
 				DWORD VirtualAddress;
 				DWORD Size;
@@ -251,6 +254,21 @@ https://tech-zealots.com/malware-analysis/pe-portable-executable-structure-malwa
 			#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
 			#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor
 
+		- Example of Image_Directory (_IMAGE_EXPORT_DIRECTORY)
+		struct IMAGE_EXPORT_DIRECTORY {
+				pub Characteristics: u32,
+				pub TimeDateStamp: u32,
+				pub MajorVersion: u16,
+				pub MinorVersion: u16,
+				pub Name: u32,
+				pub Base: u32,
+				pub NumberOfFunctions: u32,
+				pub NumberOfNames: u32,
+				pub AddressOfFunctions: u32,    <-- Address of an array of ptrs to functions
+				pub AddressOfNames: u32,        <-- Address of an array of ptr to function names
+				pub AddressOfNameOrdinals: u32, <-- Address of an array of ordinals 
+					(representing the offsets of each function in the AddressOfFunctions array)
+		}
 
 	Sections
 		- section header which is metadata related to each of the file's sections
