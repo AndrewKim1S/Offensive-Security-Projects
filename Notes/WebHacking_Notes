@@ -1,0 +1,31 @@
+###############################################################################
+#                     The Web Application Hacker's Handbook                   #
+#                                                                             #
+###############################################################################
+
+Web Application Technologies
+
+_______________________________________________________________________________
+The HTTP Protocol
+	- HTTP uses a message-based model where client sends request message and server
+		returns a response message
+	- Protocol is essentially connectionless (each request and response pair is 
+		treated as an independent transaction, and may use a different TCP connection
+
+	HTTP Requests
+		<method> <requested url> <HTTP version>
+		...
+		<referer>
+		<User-Agent>
+
+	HTTP Responses
+		<HTTP version> <numeric status code - result of request> <reason status>
+		...
+		<message body>
+		<content length>
+
+	HTTP Methods
+		GET Method: retrieve resources, can be used to send parameters to request 
+			resource in the URL query string
+		POST Method: perform actions, request parameters can be sent both in the 
+			URL query string and in the body of message
