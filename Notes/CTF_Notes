@@ -524,30 +524,3 @@ password:
 
 
 ###############################################################################
-
-pwnable.kr 
-
-fd
-A file descriptor of 0 is stdin, 1 stdout, 2 stderr, anything else are files
-which are explicitly opened.
-In C reading from file descriptor of 0 is same as getting user input
-(stdin). 
-
-flag: mommy! I think I know what a file descriptor is!!
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
