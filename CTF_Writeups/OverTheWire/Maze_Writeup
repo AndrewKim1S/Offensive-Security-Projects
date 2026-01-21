@@ -351,8 +351,107 @@ $ readelf -l exploit
 ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:     5
-Exploit:   
-Password:  
+Exploit:   reverse engineering
+Password:  dOM2C7ZKlG
+
+Exploit mitigations: stack canary & NX
+
+ghidra decompile
+int main(void) {
+  int iVar1;
+  size_t sVar2;
+  long lVar3;
+  int iVar4;
+  __uid_t __euid;
+  __uid_t __ruid;
+  int in_GS_OFFSET;
+  char user [9];
+  char pass [9];
+  iVar1 = *(int *)(in_GS_OFFSET + 0x14);
+  puts("X----------------");
+  printf(" Username: ");                                       <-- get username
+  __isoc99_scanf(&DAT_0804a026,user);
+  printf("      Key: ");                                       <-- get password
+  __isoc99_scanf(&DAT_0804a026,pass);
+  sVar2 = strlen(user);
+  if ((sVar2 != 8) || (sVar2 = strlen(pass), sVar2 != 8)) {    <-- user & pass must be length 8
+    puts("Wrong length you!");
+    exit(-1);
+  }
+  lVar3 = ptrace(PTRACE_TRACEME,0,0,0);
+  if (lVar3 == 0) {
+    iVar4 = foo(user,pass);
+    if (iVar4 == 0) {
+      puts("\nNah, wrong.");
+    }
+    else {
+      puts("\nYeh, here\'s your shell");
+      __euid = geteuid();
+      __ruid = geteuid();
+      setreuid(__ruid,__euid);
+      system("/bin/sh");
+    }
+  }
+  else {
+    puts("\nnahnah...");
+  }
+  if (iVar1 == *(int *)(in_GS_OFFSET + 0x14)) {
+    return 0;
+  }
+  __stack_chk_fail();
+}
+
+int foo(char *s,char *a) {
+  int iVar1;
+  int iVar2;
+  size_t sVar3;
+  int iVar4;
+  int in_GS_OFFSET;
+  char *a_local;
+  char *s_local;
+  int i;
+  int x;
+  char cStack_12;
+  char p [9];
+  iVar1 = *(int *)(in_GS_OFFSET + 0x14);
+  builtin_strncpy(p,"printlol",9);                             <-- copy printlol into p
+  for (i = 0; sVar3 = strlen(s), (uint)i < sVar3; i = i + 1) {
+    p[i] = p[i] - ((char)i * '\x02' + s[i] + -0x41);           <-- transform p depending on (user)
+  }
+  do {
+    iVar4 = i + -1;
+    if (i == 0) {
+      iVar4 = 1;
+      goto LAB_080492b5;                                       <-- must hit this goto
+    }
+    iVar2 = i + -1;
+    i = iVar4;
+  } while (p[iVar2] == a[iVar4]);                              <-- transformed user must equal pass
+  iVar4 = 0;
+LAB_080492b5:
+  if (iVar1 == *(int *)(in_GS_OFFSET + 0x14)) {
+    return iVar4;
+  }
+  __stack_chk_fail();
+}
+
+In order to trigger shell, we must pass in user name and password of both length 8 and such that
+transformed user will equal password
+where p[] = printlol
+p[i] = p[i] - (i * 2 + user[i] - 0x41)
+
+If we keep the transformed user the same at printlol, thus the password, then the original username
+must be 
+user[] = 'A?=;9753'
+
+p[0] = p, i = 0    112 - (0 * 2 + 0x41 - 0x41) = 112 (p)
+p[1] = r, i = 1    114 - (1 * 2 + 0x3f - 0x41) = 114 (r)
+p[2] = i, i = 2    105 - (2 * 2 + 0x3d - 0x41) = 105 (i)
+p[3] = n, i = 3    110 - (3 * 2 + 0x3b - 0x41) = 110 (n)
+p[4] = t, i = 4    116 - (4 * 2 + 0x39 - 0x41) = 116 (t)
+p[5] = l, i = 5    108 - (5 * 2 + 0x37 - 0x41) = 108 (l)
+p[6] = o, i = 6    111 - (6 * 2 + 0x35 - 0x41) = 111 (o)
+p[7] = l, i = 7    108 - (7 * 2 + 0x33 - 0x41) = 108 (l)
 
 ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
