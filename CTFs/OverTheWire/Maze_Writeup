@@ -456,8 +456,64 @@ p[7] = l, i = 7    108 - (7 * 2 + 0x33 - 0x41) = 108 (l)
 ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 
 Level:     6
-Exploit:   
+Exploit:   buffer overflow (File stream oriented programming attack) 
 Password:  
+
+Exploit mitigations: N/A
+
+ghidra decompile
+int main(int argc,char **argv) {
+  FILE *__stream;
+  size_t __n;
+  char buf [256];
+  FILE *fp;
+  if (argc != 3) {
+    printf("%s file2write2 string\n",*argv);
+    exit(-1);
+  }
+  __stream = fopen(argv[1],"a");                               <-- __stream is set to argv[1]
+  if (__stream == (FILE *)0x0) {
+    perror("fopen");
+    exit(-1);
+  }
+  strcpy(buf,argv[2]);                                         <-- buffer overflow
+  __n = strlen(buf);
+  memfrob(buf,__n);                                            <-- obfuscate overflowed buffer XOR 0x42
+  fprintf(__stream,"%s : %s\n",argv[1],buf);
+  exit(0);
+}
+
+The FILE* can be overwritten, thus point it to our constructed FILE structure.
+In our constructed FILE structure we can manipulate the write_base, write_ptr, & write_end
+
+struct _IO_FILE_plus {
+  _IO_FILE file;
+  const struct _IO_jump_t *vtable;
+};
+
+struct _IO_FILE {
+  int _flags;                    /* High-order word is _IO_MAGIC; rest is flags. */
+  char *_IO_read_ptr;	           /* Current read pointer */
+  char *_IO_read_end;	           /* End of get area. */
+  char *_IO_read_base;	         /* Start of putback+get area. */
+  char *_IO_write_base;	         /* Start of put area. */
+  char *_IO_write_ptr;	         /* Current put pointer. */
+  char *_IO_write_end;	         /* End of put area. */
+  char *_IO_buf_base;	           /* Start of reserve area. */
+  char *_IO_buf_end;	           /* End of reserve area. */
+  char *_IO_save_base;           /* Pointer to start of non-current get area. */
+  char *_IO_backup_base;         /* Pointer to first valid character of backup area */
+  char *_IO_save_end;            /* Pointer to end of non-current get area. */
+  struct _IO_marker *_markers;
+  struct _IO_FILE *_chain;
+  int _fileno;
+  int _flags2;
+  __off_t _old_offset; 
+  unsigned short _cur_column;
+  signed char _vtable_offset;
+  char _shortbuf[1];
+  _IO_lock_t *_lock;
+};
 
 ――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
 

