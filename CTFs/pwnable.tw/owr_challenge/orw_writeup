@@ -1,0 +1,80 @@
+
+┌─────────────┬───────────────────────────[ owr Writeup ]──────────────────────────────────────────┐
+| Description |
+└─────────────┘
+Disassembly
+08048548 <main>:
+ 8048548:       8d 4c 24 04             lea    0x4(%esp),%ecx
+ 804854c:       83 e4 f0                and    $0xfffffff0,%esp
+ 804854f:       ff 71 fc                push   -0x4(%ecx)
+ 8048552:       55                      push   %ebp
+ 8048553:       89 e5                   mov    %esp,%ebp
+ 8048555:       51                      push   %ecx
+ 8048556:       83 ec 04                sub    $0x4,%esp
+ 8048559:       e8 6d ff ff ff          call   80484cb <orw_seccomp>
+ 804855e:       83 ec 0c                sub    $0xc,%esp
+ 8048561:       68 a0 86 04 08          push   $0x80486a0
+ 8048566:       e8 15 fe ff ff          call   8048380 <printf@plt>
+ 804856b:       83 c4 10                add    $0x10,%esp
+ 804856e:       83 ec 04                sub    $0x4,%esp
+ 8048571:       68 c8 00 00 00          push   $0xc8
+ 8048576:       68 60 a0 04 08          push   $0x804a060
+ 804857b:       6a 00                   push   $0x0
+ 804857d:       e8 ee fd ff ff          call   8048370 <read@plt>
+ 8048582:       83 c4 10                add    $0x10,%esp
+ 8048585:       b8 60 a0 04 08          mov    $0x804a060,%eax
+ 804858a:       ff d0                   call   *%eax
+ 804858c:       b8 00 00 00 00          mov    $0x0,%eax
+ 8048591:       8b 4d fc                mov    -0x4(%ebp),%ecx
+ 8048594:       c9                      leave
+ 8048595:       8d 61 fc                lea    -0x4(%ecx),%esp
+ 8048598:       c3                      ret
+ 8048599:       66 90                   xchg   %ax,%ax
+ 804859b:       66 90                   xchg   %ax,%ax
+ 804859d:       66 90                   xchg   %ax,%ax
+ 804859f:       90                      nop
+
+Decompilation
+main() {
+  orw_seccomp();
+  printf("Give my your shellcode:");
+  read(0,shellcode,200);
+  (*(code *)shellcode)();
+  return 0;
+}
+
+orw_seccomp() {
+  int iVar1;
+  undefined4 *puVar2;
+  undefined4 *puVar3;
+  int in_GS_OFFSET;
+  undefined2 local_88 [2];
+  undefined4 *local_84;
+  undefined4 local_80 [24];
+  int local_20;
+  
+  local_20 = *(int *)(in_GS_OFFSET + 0x14);
+  puVar2 = &DAT_08048640;
+  puVar3 = local_80;
+  for (iVar1 = 0x18; iVar1 != 0; iVar1 = iVar1 + -1) {
+    *puVar3 = *puVar2;
+    puVar2 = puVar2 + 1;
+    puVar3 = puVar3 + 1;
+  }
+  local_88[0] = 0xc;
+  local_84 = local_80;
+  prctl(0x26,1,0,0,0);
+  prctl(0x16,2,local_88);
+  if (local_20 != *(int *)(in_GS_OFFSET + 0x14)) {         <-- stack canary check
+    /* WARNING: Subroutine does not return */
+    __stack_chk_fail();
+  }
+}
+
+The program calls orw_seccomp(), and then reads in shellcode. It then executes the shellcode
+
+┌─────────┐
+| Exploit |
+└─────────┘
+
+Exploit Mitigations: ASLR, Canary, Partial RELRO
