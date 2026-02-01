@@ -1,0 +1,11 @@
+
+┌─────────────┬───────────────────────────[ owr Writeup ]──────────────────────────────────────────┐
+| Description |
+└─────────────┘
+
+┌─────────┐
+| Exploit |
+└─────────┘
+
+Exploit Mitigations: ASLR, Canary, NX, Partial RELRO
+
