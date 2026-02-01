@@ -36,10 +36,10 @@ Disassembly
 
 Decompilation
 main() {
-  orw_seccomp();
+  orw_seccomp();                                           <-- hardens proc against shellcode
   printf("Give my your shellcode:");
-  read(0,shellcode,200);
-  (*(code *)shellcode)();
+  read(0,shellcode,200);                                   <-- read 200 bytes of shellcode
+  (*(code *)shellcode)();                                  <-- execute shellcode
   return 0;
 }
 
@@ -53,28 +53,34 @@ orw_seccomp() {
   undefined4 local_80 [24];
   int local_20;
   
-  local_20 = *(int *)(in_GS_OFFSET + 0x14);
-  puVar2 = &DAT_08048640;
-  puVar3 = local_80;
-  for (iVar1 = 0x18; iVar1 != 0; iVar1 = iVar1 + -1) {
+  local_20 = *(int *)(in_GS_OFFSET + 0x14);                <-- stack canary
+  puVar2 = &DAT_08048640;                                  <-- global variable at 0x08048640
+  puVar3 = local_80;                                       <-- 24 byte buffer
+  for (iVar1 = 0x18; iVar1 != 0; iVar1 = iVar1 + -1) {     <-- copy 24 bytes from global var to buf
     *puVar3 = *puVar2;
     puVar2 = puVar2 + 1;
     puVar3 = puVar3 + 1;
   }
   local_88[0] = 0xc;
   local_84 = local_80;
-  prctl(0x26,1,0,0,0);
-  prctl(0x16,2,local_88);
+  prctl(0x26,1,0,0,0);                                     <-- proc can never gain new priviledges
+  prctl(0x16,2,local_88);                                  <-- seccomp (syscall firewall)
   if (local_20 != *(int *)(in_GS_OFFSET + 0x14)) {         <-- stack canary check
     /* WARNING: Subroutine does not return */
     __stack_chk_fail();
   }
 }
 
-The program calls orw_seccomp(), and then reads in shellcode. It then executes the shellcode
-
 ┌─────────┐
 | Exploit |
 └─────────┘
 
 Exploit Mitigations: ASLR, Canary, Partial RELRO
+
+orw_seccomp() constrains the shellcode from using important syscalls and priviledge escalation is
+prevented
+Only the read, write, & open syscalls are allowed to be used
+To get the flag instead of attempting to get shell, we can have shellcode open flag file, read, and
+then write flag.
+
+FLAG{sh3llc0ding_w1th_op3n_r34d_writ3}
