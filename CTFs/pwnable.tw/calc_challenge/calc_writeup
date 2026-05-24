@@ -1,7 +1,183 @@
 
-┌─────────────┬───────────────────────────[ owr Writeup ]──────────────────────────────────────────┐
+┌─────────────┬───────────────────────────[ calc Writeup ]──────────────────────────────────────────
 | Description |
 └─────────────┘
+Decompile (STACK CANARY CHECKS & INITs MERGED FOR SIMPLIFICATION)
+
+main() {
+  signal(0xe,timeout);                                     // register timeout for SIGALARM
+  alarm(0x3c);                                             // sends SIGALARM to proc after 60 sec
+  puts("=== Welcome to SECPROG calculator ===");
+  fflush((FILE *)stdout);
+  calc();                                                  // calc 
+  puts("Merry Christmas!");
+  return;
+}
+
+
+calc() {
+  int iVar1;                                               // temp return val for get_expr() & parse_expr()
+  int local_5a4;                                           // pointer to auStack_5a0
+  undefined4 auStack_5a0 [100];                            // 100 element array of (4 byte) - 400 bytes
+  undefined1 local_410 [1024];                             // 1024 element array of (1 byte) - 1024 bytes 
+
+  while( true ) {                                          // infinite loop
+    bzero(local_410, 0x400);                               // init local_410 array to '\0'
+    iVar1 = get_expr(local_410, 0x400);                    // get_expr(local_410, local_410 length) reads user input into 
+		                                                           local_410, iVar1 = number of chars added into local_410
+    if (iVar1 == 0) break;                                 // exit loop if get_expr is 0
+    init_pool(&local_5a4);                                 // init auStack_5a0 array to '\0', set local_5a4 ptr to 0
+    iVar1 = parse_expr(local_410, &local_5a4);             // 
+
+    if (iVar1 != 0) {
+      printf("%d\n",auStack_5a0[local_5a4 + -1]);          // if parse_expr is not 0, print auStack_5a0[local_5a4 - 1]
+      fflush((FILE *)stdout);
+    }
+  }
+}
+
+
+get_expr(int param_1, int param_2) {
+  ssize_t sVar1;
+  char local_11;
+  int local_10 = 0;                                        // number of chars accepted
+
+  while (local_10 < param_2) {                             // Iterate while local_10 < param_2 (array length)
+    sVar1 = read(0, &local_11, 1);                         // read 1 byte of data (char) into local_11
+    if ((sVar1 == -1) || (local_11 == '\n')) break;        // exit loop if read fails or enter key pressed
+		                                                       // filter arithmetic operators, and digits
+    if ((((local_11 == '+') || (((local_11 == '-' || (local_11 == '*')) || (local_11 == '/')))) ||
+        (local_11 == '%'))) {
+      *(char *)(local_10 + param_1) = local_11;            // param_1[local_10] = input char
+      local_10 = local_10 + 1;                             // local_10 += 1
+    }
+  }
+  *(undefined1 *)(param_1 + local_10) = 0;                 // end array, param_1[local_10] = 0
+  return local_10;                                         // return how many characters were added into param_1
+}
+
+
+// Function used to set pointer index to 0, init 100 elements of array to 0
+init_pool(undefined4 *param_1) {
+   int local_8;   
+   *param_1 = 0;
+   for (local_8 = 0; local_8 < 100; local_8 = local_8 + 1) {
+       param_1[local_8 + 1] = 0;
+   }
+   return;
+}
+
+
+// param_1 = local_410 (holds input expr), param_2 = &local_5a4 (empty)
+parse_expr(void *param_1, int *param_2) {
+  int iVar1;
+  char *__s1;
+  int iVar2;
+  undefined4 uVar3;
+  size_t __n;
+  void *local_8c = param_1;                                // pointer to local_410 (mark start of current numeric substring)
+  int local_88 = 0;                                        // local_410 array index
+  int local_84 = 0;                                        // local_74 array index
+  char local_74 [100];                                     // char array 100 elements to '\0'. Meant to hold operators
+  bzero(local_74,100);
+
+  do {
+	                                                         // if 9 < local_410[local_88] - '0' then else local_88 += 1
+																													 // local_410[local_88] - '0' essentially converts ascii digit to value
+																													 // '0' - '0' = 0, ... '9' - '0' = 9 all fail the condition
+																													 // All non digits pass, values less than '0' will be negative and wrap
+    if (9 < (int)*(char *)((int)param_1 + local_88) - 0x30U) {   
+      __n = (int)param_1 + (local_88 - (int)local_8c);     // __n = local_410[local_88 - local_8c]
+      __s1 = malloc(__n + 1);                              // allocate memory of size __n
+      memcpy(__s1, local_8c, __n);                         // copy __n bytes from local_8c pointer (numeric value)
+      __s1[__n] = '\0';
+      iVar2 = strcmp(__s1, "0");                           // check if __s1 is "0"
+      if (iVar2 == 0) {                                    // fail if __s1 is "0" (1+0 or 0+1) Check if value is 0
+        puts("prevent division by zero");
+        fflush((FILE *)stdout);
+        uVar3 = 0;
+        goto LAB_0804935f;
+      }
+      iVar2 = atoi(__s1);                                  // convert __s1 to integer
+      if (0 < iVar2) {                                     // if __s1 is > 0 (store numeric value in local_5a4
+        iVar1 = *param_2;                                      // iVar1 is set to local_5a4 pointer
+        *param_2 = iVar1 + 1;                                  // local_5a4 pointer moved up 1
+        param_2[iVar1 + 1] = iVar2;                            // local_5a4[iVar1 + 1] = __s1
+      }
+			                                                     // if local_410[local_88 + 1] != 0 and
+																													 // if local_410[local_88 + 1] converted to int is not a digit.
+																													 // fail (1++1) Check if multiple operators are adjacent
+      if ((*(char *)((int)param_1 + local_88) != '\0') &&  
+         (9 < (int)*(char *)((int)param_1 + local_88 + 1) - 0x30U)) {
+        puts("expression error!");
+        fflush((FILE *)stdout);
+        uVar3 = 0;
+        goto LAB_0804935f;
+      }
+      local_8c = (void *)((int)param_1 + local_88 + 1);    // local_8c = local_410[local_88 + 1] set to next char after operation
+      if (local_74[local_84] == '\0') {                    // if local_74[local_84] == '\0' then set to local_410[local_88]
+			                                                     // (if there are no operators on the stack local_74)
+        local_74[local_84] = *(char *)((int)param_1 + local_88);
+      }
+      else {                                               // else 
+        switch(*(undefined1 *)((int)param_1 + local_88)) { // switch over local_410[local_88] (current operator) 
+        case 0x25:
+        case 0x2a:
+        case 0x2f:                                         // for %*/ 
+				                                                   // if local_74[local_84] is '+' or '-' (previous operator)
+																													     // local_74[local_84 + 1] = local_410[local_88], inc local_84
+          if ((local_74[local_84] == '+') || (local_74[local_84] == '-')) {
+            local_74[local_84 + 1] = *(char *)((int)param_1 + local_88);
+            local_84 = local_84 + 1;
+          }
+          else {                                           // else (no low precedence operators exist)
+            eval(param_2, (int)local_74[local_84]);            // eval 
+            local_74[local_84] = *(char *)((int)param_1 + local_88);  // after eval, replace evaluated operator with (current)
+          }
+          break;
+        default:                                           // ??? Why??? Unless there is operator not in whitelist 
+          eval(param_2,(int)local_74[local_84]);           // after +-, this default block will run
+          local_84 = local_84 + -1;
+          break;
+        case 0x2b:
+        case 0x2d:                                         // for +-
+          eval(param_2, (int)local_74[local_84]);          // eval 
+          local_74[local_84] = *(char *)((int)param_1 + local_88);  // after eval, replace evaluated operator with (current)
+        }
+      }
+      if (*(char *)((int)param_1 + local_88) == '\0') {    // if local_410[local_88] = '\0'
+        for (; -1 < local_84; local_84 = local_84 + -1) {  // 
+          eval(param_2,(int)local_74[local_84]);
+        }
+        uVar3 = 1;
+LAB_0804935f:                                              // return with uVar3, 0 is failure, 1 is success
+        return uVar3;
+      }
+    }
+    local_88 = local_88 + 1;                               // increment local_88 pointer to local_410 expr
+  } while( true );
+}
+
+
+// param_1 = *local_5a4, param_2 = local_74[local_84]
+eval(int *param_1, char param_2) {
+   if (param_2 == '+') {                                   // ADD
+       param_1[*param_1 + -1] = param_1[*param_1 + -1] + param_1[*param_1];
+   }
+   else if (param_2 < ',') {
+       if (param_2 == '*') {                               // MULTIPLICATION
+           param_1[*param_1 + -1] = param_1[*param_1 + -1] * param_1[*param_1];
+       }
+   }
+   else if (param_2 == '-') {                              // SUBTRACTION
+       param_1[*param_1 + -1] = param_1[*param_1 + -1] - param_1[*param_1];
+   }
+   else if (param_2 == '/') {                              // DIVISION
+       param_1[*param_1 + -1] = param_1[*param_1 + -1] / param_1[*param_1];
+   }
+   *param_1 = *param_1 + -1;
+   return;
+}
 
 ┌─────────┐
 | Exploit |
