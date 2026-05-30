@@ -36,7 +36,6 @@ calc() {
   }
 }
 
-
 get_expr(int param_1, int param_2) {
   ssize_t sVar1;
   char local_11;
@@ -66,6 +65,51 @@ init_pool(undefined4 *param_1) {
    }
    return;
 }
+
+
+          High
+main     ┌─────────────────┐ 
+         ├─────────────────┤
+         |  return addr    | [4 bytes]	    
+         ├─────────────────┤
+calc     |  frame pointer  | [4 bytes] 
+         ├─────────────────┤
+         |  iVar1          | [4 bytes]
+         ├─────────────────┤
+         |  local_5a4      | [4 bytes]     pointer to auStack_5a0
+         ├─────────────────┤
+         |  auStack_5a0    | [400 bytes]   array of ???
+         ├─────────────────┤
+         |  local_410      | [1024 bytes]  array of input expr
+         ├─────────────────┤
+         |  void *param_1  | [4 bytes]     pointer to local_410
+         ├─────────────────┤
+         |  void *param_2  | [4 bytes]     ref to local_5a4 
+         ├─────────────────┤
+         |  return addr    | [4 bytes]
+         ├─────────────────┤
+parse    |  frame pointer  | [4 bytes]
+expr     ├─────────────────┤
+         |  iVar1          | [4 bytes]
+         ├─────────────────┤
+         |  *__s1          | [4 bytes]     memory holds numeric value
+         ├─────────────────┤
+         |  iVar2          | [4 bytes]
+         ├─────────────────┤
+         |  uVar3          | [4 bytes]     return value
+         ├─────────────────┤
+         |  __n            | [4 bytes]     size of numeric value
+         ├─────────────────┤
+         |  *local_8c      | [4 bytes]
+         ├─────────────────┤
+         |  local_88       | [4 bytes]     local_410/param_1 index
+         ├─────────────────┤
+         |  local_84       | [4 bytes]     local_74 index
+         ├─────────────────┤
+         |  local_74       | [100 bytes]   array of operators
+         ├─────────────────┤
+         └─────────────────┘
+         Low
 
 
 // param_1 = local_410 (holds input expr), param_2 = &local_5a4 (empty)
@@ -115,7 +159,7 @@ parse_expr(void *param_1, int *param_2) {
         goto LAB_0804935f;
       }
       local_8c = (void *)((int)param_1 + local_88 + 1);    // local_8c = local_410[local_88 + 1] set to next char after operation
-      if (local_74[local_84] == '\0') {                    // if local_74[local_84] == '\0' then set to local_410[local_88]
+      if (local_74[local_84] == '\0') {                    // if local_74[local_84] == '\0' then set to local_410[local_88] (op)
 			                                                     // (if there are no operators on the stack local_74)
         local_74[local_84] = *(char *)((int)param_1 + local_88);
       }
@@ -178,6 +222,9 @@ eval(int *param_1, char param_2) {
    *param_1 = *param_1 + -1;
    return;
 }
+
+
+
 
 ┌─────────┐
 | Exploit |
