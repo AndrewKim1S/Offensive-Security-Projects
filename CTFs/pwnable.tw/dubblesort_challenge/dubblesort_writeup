@@ -2,7 +2,130 @@
 ┌─────────────┬───────────────────────────[ dubblesort Writeup ]──────────────────────────────────────────
 | Description |
 └─────────────┘
+Decompile
+
+main() {
+  undefined4 uVar1;
+  uint uVar2;
+  undefined4 *puVar3;                                        // ptr into numbers list
+  int in_GS_OFFSET;
+  uint local_78;                                             // Len of numbers to sort
+  undefined4 local_74 [8];                                   // Numbers list 24 bytes
+  undefined1 local_54 [64];                                  // Name 64 bytes
+  int canary = *(int *)(in_GS_OFFSET + 0x14);                // Canary
+  FUN_000108b5();
+  __printf_chk(1,"What your name :");
+  read(0,local_54,0x40);                                     // Set local_54 to name
+  __printf_chk(1,"Hello %s,How many numbers do you what to sort :",local_54);
+  scanf(&DAT_00010bfa,&local_78);                            // Set len(numbers to sort) to local_78 ('%u')
+  if (local_78 != 0) {                                       // if len(numbers to sort) !=
+    puVar3 = local_74;                                       // pointer to numbers list
+    uVar2 = 0;                                               // loop index
+    do {
+      __printf_chk(1,"Enter the %d number : ",uVar2);
+      fflush(_stdout);
+      scanf(&DAT_00010bfa,puVar3);                           // store number in numbers list ('%u')
+      uVar2 = uVar2 + 1;                                     // increment loop index
+      puVar3 = puVar3 + 1;                                   // increment pointer in numbers list
+    } while (uVar2 < local_78);                              // Go until all the numbers to sort are done
+  }
+  FUN_00010931(local_74,local_78);                           // sort function
+  puts("Result :");
+  if (local_78 != 0) {                                       // Iterate through the list and print
+    uVar2 = 0;
+    do {
+      __printf_chk(1,&DAT_00010c1d,local_74[uVar2]);
+      uVar2 = uVar2 + 1;
+    } while (uVar2 < local_78);
+  }
+  uVar1 = 0;
+  if (canary != *(int *)(in_GS_OFFSET + 0x14)) {             // Stack Canary Check
+    uVar1 = FUN_00010ba0();
+  }
+  return uVar1;
+}
+
+// Bubblesort on (Numbers list, Len of numbers list)
+FUN_00010931(uint *param_1,int param_2) {
+   uint uVar2;
+   uint *puVar3;
+   int iVar4;
+   uint *puVar5;
+   int in_GS_OFFSET;
+   int iVar1 = *(int *)(in_GS_OFFSET + 0x14);
+   puts("Processing......");
+   sleep(1);
+   if (param_2 == 1) {                                       // If there is only 1 value return (already sorted)
+LAB_000109a9:
+      if (iVar1 != *(int *)(in_GS_OFFSET + 0x14)) {          // Stack Canary Check
+         FUN_00010ba0();
+      }
+      return;
+   }
+   iVar4 = param_2 + -2;                                     // iVar4 = len of numbers list - 2
+   puVar5 = param_1 + param_2 + -1;                          // puVar5 = numbers_list[-1]
+   do {
+      puVar3 = param_1;                                      // puVar3 = head of list
+      if (iVar4 != -1) {                                     
+         do {
+            uVar2 = *puVar3;                                 // uVar2 = *puVar3 (tmp value)
+            if (puVar3[1] < uVar2) {                         // if numbers_list[i + 1] < numbers_list[i]
+               *puVar3 = puVar3[1];                          // numbers_list[i] = numbers_list[i+1]
+               puVar3[1] = uVar2;                            // numbers_list[i+1] = uVar2
+            }
+            puVar3 = puVar3 + 1;                             // Increment puVar3
+         } while (puVar5 != puVar3);                         // if the end of the sorted list is the head of the list 
+         if (iVar4 == 0) goto LAB_000109a9;                  // If we are done, exit
+      }
+      iVar4 = iVar4 + -1;                                    // Decrement iVar4
+      puVar5 = puVar5 + -1;                                  // Decrement puVar5
+   } while( true );
+}
+
+            High 
+            ┌─────────────────┐
+0xffffcc5c  | return address  | [4 bytes]
+            ├─────────────────┤
+0xffffcc58  | frame pointer   | [4 bytes]
+            ├─────────────────┤
+0xffffcc40  | saved regs/etc  | [24 bytes]
+            ├─────────────────┤
+0xffffcc3c  | canary          | [4 bytes] 
+            ├─────────────────┤
+0xffffcbfc  | local_54        | [64 bytes]    Name
+            ├─────────────────┤
+0xffffcbdc  | local_74        | [24 bytes]    Numbers List
+            ├─────────────────┤
+0xffffcbd8  | local_78        | [4 bytes]     Total amount of numbers to sort = len(local_74)
+            ├─────────────────┤
+            | ...             | Unknown vars & function args 
+            └─────────────────┘
+            Low
+
 
 ┌─────────┐
 | Exploit |
 └─────────┘
+32 bit, stripped - Full RELRO, Canary, NX, PIE, ASLR
+
+The length of local_74 is 8. However we can input a higher value meaning that local_74 can overwrite all the way up
+to the return address. 
+The sort function will sort all values based on the length of local_74. Thus if the length of local_74 includes the 
+return address and stack canary this will also be sorted. 
+
+33 numbers to "sort" will fully overwrite the return address. This is an offset of (33 * 4 bytes)
+The overwritten values should be strategic. Because all the values including the return address will be sorted it will 
+mean that everything before the canary should be less than it, and everything above the canary should be greater than it.
+
+An input of + with scanf %d means that the original memory value will not affected. Therefore the stack canary does not have
+to be leaked. Rather using the correct offsets a + or other non digit input will leave the canary intact.
+
+__printf_chk of name can be leveraged as info leak. Because there is existing garbage in memory, manipulating the name length
+to gracefully overwrite only parts of memory will mean that additional info can be leaked in the print.
+A name input of 20 bytes will leak the 4 bytes at 0xffffcc10. This value 0xf7...... is a libc value
+
+0xffffcbfc:     0x00000008
+0xffffcc00:     0x00000009      0x0000000a      0x00000000      0xffffdfad
+0xffffcc10:     0xf7fc4580      0xf7fc4000
+
+Because all address we can write to will be sorted - a classic ROP chain cannot work. Instead ret2libc is the only option
