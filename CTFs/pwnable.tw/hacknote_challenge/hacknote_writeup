@@ -9,8 +9,7 @@ main() {
   int in_GS_OFFSET;
   char local_18 [4];                                         // choice input for read - char array
   undefined4 local_14;                                       // canary
-  undefined1 *puStack_c;                                     // ???
-
+  undefined1 *puStack_c;
   puStack_c = &stack0x00000004;
   local_14 = *(undefined4 *)(in_GS_OFFSET + 0x14);
   setvbuf(stdout,(char *)0x0,2,0);
@@ -44,26 +43,35 @@ LAB_08048a96:
 }
 
 
-delete_note() {
-  int iVar1;
-  int in_GS_OFFSET;
-  char local_14 [4];
-  int local_10;
+struct Note {
+  void *funcptr;  (FUN_0804862b) [4 bytes]
+  char *content;                 [4 bytes]
+};
+FUN_0804862b(int param_1) {                                  // Simply prints out content
+  puts(*(char **)(param_1 + 4));
+  return;
+}
 
+
+delete_note() {
+  int iVar1;                                                 // integer of note to delete
+  int in_GS_OFFSET;
+  char local_14 [4];                                         // input of note to delete
+  int local_10;
   local_10 = *(int *)(in_GS_OFFSET + 0x14);
   printf("Index :");
-  read(0,local_14,4);
-  iVar1 = atoi(local_14);
-  if ((iVar1 < 0) || (DAT_0804a04c <= iVar1)) {
+  read(0,local_14,4);                                        // input of note to delete 
+  iVar1 = atoi(local_14);                                    // iVar1 is input of note to delete
+  if ((iVar1 < 0) || (note_count <= iVar1)) {                // check boundary of note to delete
     puts("Out of bound!");
     _exit(0);
   }
-  if (*(int *)(&DAT_0804a050 + iVar1 * 4) != 0) {
-    free(*(void **)(*(int *)(&DAT_0804a050 + iVar1 * 4) + 4));
-    free(*(void **)(&DAT_0804a050 + iVar1 * 4));
+  if (*(int *)(&note_array + iVar1 * 4) != 0) {              // if note_array at index to delete is not null
+    free(*(void **)(*(int *)(&note_array + iVar1 * 4) + 4)); // free some funcptr
+    free(*(void **)(&note_array + iVar1 * 4));               // free some value
     puts("Success");
   }
-  if (local_10 != *(int *)(in_GS_OFFSET + 0x14)) {
+  if (local_10 != *(int *)(in_GS_OFFSET + 0x14)) {           // canary check
     __stack_chk_fail();
   }
   return;
@@ -72,38 +80,37 @@ delete_note() {
 
 add_note() {
   int iVar1;
-  void *pvVar2;
-  size_t __size;
+  void *pvVar2;                                              // pointer to allocated memory
+  size_t __size;                                             // note size input integer
   int in_GS_OFFSET;
-  int local_20;
-  char local_18 [8];
-  int local_10;
-
+  int local_20;                                              // loop index
+  char local_18 [8];                                         // note size input
+  int local_10;                                              // canary
   local_10 = *(int *)(in_GS_OFFSET + 0x14);
-  if (DAT_0804a04c < 6) {
+  if (note_count < 6) {                                      // max of 5 elements in note_array
     for (local_20 = 0; local_20 < 5; local_20 = local_20 + 1) {
-      if (*(int *)(&DAT_0804a050 + local_20 * 4) == 0) {
-        pvVar2 = malloc(8);
-        *(void **)(&DAT_0804a050 + local_20 * 4) = pvVar2;
-        if (*(int *)(&DAT_0804a050 + local_20 * 4) == 0) {
+      if (*(int *)(&note_array + local_20 * 4) == 0) {       // if there is an open space in note_array 
+        pvVar2 = malloc(8);                                  // allocate 8 bytes into pvVar2
+        *(void **)(&note_array + local_20 * 4) = pvVar2;     // set note_array[local_20] = pvVar2
+        if (*(int *)(&note_array + local_20 * 4) == 0) {     // failed to allocated
           puts("Alloca Error");
           exit(-1);
         }
-        **(undefined4 **)(&DAT_0804a050 + local_20 * 4) = FUN_0804862b;
+        **(undefined4 **)(&note_array + local_20 * 4) = FUN_0804862b;  // set allocated value to FUN_0804862b
         printf("Note size :");
-        read(0,local_18,8);
-        __size = atoi(local_18);
-        iVar1 = *(int *)(&DAT_0804a050 + local_20 * 4);
-        pvVar2 = malloc(__size);
-        *(void **)(iVar1 + 4) = pvVar2;
-        if (*(int *)(*(int *)(&DAT_0804a050 + local_20 * 4) + 4) == 0) {
+        read(0,local_18,8);                                  // input of note size
+        __size = atoi(local_18);                             // input of note size to integer __size
+        iVar1 = *(int *)(&note_array + local_20 * 4);
+        pvVar2 = malloc(__size);                             // allocate __size amount
+        *(void **)(iVar1 + 4) = pvVar2;                      // note_array[local_20] + 4 = pvVar (memory of __size)
+        if (*(int *)(*(int *)(&note_array + local_20 * 4) + 4) == 0) {  
           puts("Alloca Error");
           exit(-1);
         }
-        printf("Content :");
-        read(0,*(void **)(*(int *)(&DAT_0804a050 + local_20 * 4) + 4),__size);
+        printf("Content :");                                 // read in content directly into note_array[local_20]+4
+        read(0,*(void **)(*(int *)(&note_array + local_20 * 4) + 4),__size);  
         puts("Success !");
-        DAT_0804a04c = DAT_0804a04c + 1;
+        note_count = note_count + 1;
         break;
       }
     }
@@ -119,24 +126,23 @@ add_note() {
 
 
 print_note() {
-  int iVar1;
+  int iVar1;                                                 // integer of input of note to print
   int in_GS_OFFSET;
-  char local_14 [4];
-  int local_10;
-   
+  char local_14 [4];                                         // input of note to print
+  int local_10;                                              // canary
   local_10 = *(int *)(in_GS_OFFSET + 0x14);
   printf("Index :");
-  read(0,local_14,4);
-  iVar1 = atoi(local_14);
-  if ((iVar1 < 0) || (DAT_0804a04c <= iVar1)) {
+  read(0,local_14,4);                                        // get index of note to print into local_14
+  iVar1 = atoi(local_14);                                    // set iVar1 to note to print
+  if ((iVar1 < 0) || (note_count <= iVar1)) {                // check note to print is within bounds
     puts("Out of bound!");
     _exit(0);
   }
-  if (*(int *)(&DAT_0804a050 + iVar1 * 4) != 0) {
-    (*(code *)**(undefined4 **)(&DAT_0804a050 + iVar1 * 4))
-              (*(undefined4 *)(&DAT_0804a050 + iVar1 * 4));
+  if (*(int *)(&note_array + iVar1 * 4) != 0) {              // if note_array[i] != 0, call the funcptr
+    (*(code *)**(undefined4 **)(&note_array + iVar1 * 4))
+              (*(undefined4 *)(&note_array + iVar1 * 4));
   }
-  if (local_10 != *(int *)(in_GS_OFFSET + 0x14)) {
+  if (local_10 != *(int *)(in_GS_OFFSET + 0x14)) {           // canary check
     __stack_chk_fail();
   }
   return;
@@ -147,4 +153,5 @@ print_note() {
 | Exploit |
 └─────────┘
 Canary, NX, ASLR
+
 
