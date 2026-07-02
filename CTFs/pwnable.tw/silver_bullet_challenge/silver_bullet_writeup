@@ -1,0 +1,149 @@
+
+┌─────────────┬───────────────────────────[ 3x17 Writeup ]──────────────────────────────────────────
+| Description |
+└─────────────┘
+Leverage pwninit to get the correct ld 
+wget -O pwninit https://github.com/io12/pwninit/releases/download/3.3.0/pwninit
+chmod +x pwninit
+./pwninit --bin silver_bullet --libc libc.so.6
+
+
+
+            High 
+            ┌─────────────────┐
+            | return address  | [4 bytes]
+            ├─────────────────┤
+            | frame pointer   | [4 bytes]
+            ├─────────────────┤
+            | local_8 
+            ├─────────────────┤
+            | local_38        
+            ├─────────────────┤
+            | local_3c        
+            ├─────────────────┤
+            | local_40 
+            ├─────────────────┤
+            | iVar1
+            ├─────────────────┤
+            └─────────────────┘
+            Low
+
+
+Decompile
+main() {
+  int iVar1;                                                 // user input
+  undefined4 local_40;                                       // ptr to werewolf hp, name
+  undefined *local_3c;                                       // power, or length of "bullet"
+  char local_38 [48];                                        // char array of 48 bytes "bullet"
+  undefined4 local_8;
+  init_proc();
+  local_8 = 0;
+  memset(local_38,0,0x30);
+  local_40 = 0x7fffffff;
+  local_3c = &DAT_08048d06;
+  do {
+    while( true ) {
+      while( true ) {
+        menu();                                              // prints menu
+        iVar1 = read_int();                                  // reads value into int
+        if (iVar1 != 2) break;                               // if input = 2 -> power_up()
+        power_up(local_38);
+      }
+      if (2 < iVar1) break;
+      if (iVar1 == 1) {
+        create_bullet(local_38);                             // if input = 1 -> create_bullet()
+      }
+      else {
+    LAB_08048a05:
+        puts("Invalid choice");
+      }
+    }
+    if (iVar1 != 3) {
+      if (iVar1 == 4) {                                      // if input = 4 -> exit()
+        puts("Don\'t give up !");
+        exit(0);
+      }
+      goto LAB_08048a05;
+    }
+    iVar1 = beat(local_38,&local_40);                        // if input = 3 -> beat()
+    if (iVar1 != 0) {
+      return 0;                                              // If werewolf dies, return
+    }
+    puts("Give me more power !!");
+  } while( true );
+}
+
+// power is the length of "bullet" char array
+power_up(char *param_1) {                                    //  
+  size_t sVar1;
+  char local_38 [48];
+  int local_8; 
+  local_8 = 0;
+  memset(local_38,0,0x30);                                   // set 48 bytes of local_38 to 0
+  if (*param_1 == '\0') {                                    // check if "bullet" is not set yet
+    puts("You need create the bullet first !");
+  }
+  else if (*(uint *)(param_1 + 0x30) < 0x30) {               // check 4 bytes after "bullet" - length
+    printf("Give me your another description of bullet :");
+    read_input(local_38,0x30 - *(int *)(param_1 + 0x30));
+    strncat(param_1,local_38,0x30 - *(int *)(param_1 + 0x30));
+    sVar1 = strlen(local_38);
+    local_8 = *(int *)(param_1 + 0x30) + sVar1;              // new power is len of new input + previous length?
+    printf("Your new power is : %u\n",local_8);
+    *(int *)(param_1 + 0x30) = local_8;                      // set new power as length
+    puts("Enjoy it !");
+  }
+  else {
+    puts("You can\'t power up any more !");
+  }
+  return;
+}
+
+create_bullet(char *param_1) {
+  size_t sVar1; 
+  if (*param_1 == '\0') {                                    // check if "bullet" is created or not
+    printf("Give me your description of bullet :",0);
+    read_input(param_1,0x30);                                // get "bullet"
+    sVar1 = strlen(param_1); 
+    printf("Your power is : %u\n",sVar1);                    // set power as length of input "bullet"
+    *(size_t *)(param_1 + 0x30) = sVar1;
+    puts("Good luck !!");
+  }
+  else {
+    puts("You have been created the Bullet !");
+  }
+  return;
+}
+
+beat(char *param_1,int *param_2) {
+  undefined4 uVar1; 
+  if (*param_1 == '\0') {
+    puts("You need create the bullet first !");
+    uVar1 = 0;
+  }
+  else {
+    puts(">----------- Werewolf -----------<");
+    printf(" + NAME : %s\n",param_2[1]);                     // Print werewold name
+    printf(" + HP : %d\n",*param_2);                         // Print werewolf hp
+    puts(">--------------------------------<");
+    puts("Try to beat it .....");
+    usleep(1000000);
+    *param_2 = *param_2 - *(int *)(param_1 + 0x30);          // Reduce hp by power
+    if (*param_2 < 1) {                                      // If werewolf hp reduced to 0 then you win
+      puts("Oh ! You win !!");
+      uVar1 = 1;
+    }
+    else {
+      puts("Sorry ... It still alive !!");
+      uVar1 = 0;
+    }
+  }
+  return uVar1;                                              // Return 1 if werewolf has 0 health, return 0 if werewolf is alive
+}
+
+
+┌─────────┐
+| Exploit |
+└─────────┘
+ASLR, Full RELRO, NX
+
