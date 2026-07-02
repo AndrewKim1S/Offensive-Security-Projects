@@ -5,4 +5,6 @@
 - calc
 - 3x17
 - dubblesort
+- hacknote
+
 
