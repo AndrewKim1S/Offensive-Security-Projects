@@ -6,5 +6,6 @@
 - 3x17
 - dubblesort
 - hacknote
+- silver bullet
 
 
