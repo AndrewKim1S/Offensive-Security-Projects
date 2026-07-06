@@ -1,0 +1,14 @@
+
+┌─────────────┬───────────────────────────[ applestore Writeup ]──────────────────────────────────────────
+| Description |
+└─────────────┘
+Leverage pwninit to get the correct ld (rename libc so file to libc.so.6) 
+wget -O pwninit https://github.com/io12/pwninit/releases/download/3.3.0/pwninit
+chmod +x pwninit
+./pwninit --bin applestore --libc libc.so.6
+
+
+┌─────────┐
+| Exploit |
+└─────────┘
+
