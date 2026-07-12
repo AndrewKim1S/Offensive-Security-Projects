@@ -128,7 +128,7 @@ delete() {
   int iVar2;
   int in_GS_OFFSET;
   int counter = 1;
-  undefined4 *local_38 = (undefined4 *)myCart._8_4_;
+  product *runner = (undefined4 *)myCart._8_4_;              // runner to iterate through myCart linkedlist
   char input [22];
   int canary = *(int *)(in_GS_OFFSET + 0x14);
   printf("Item Number> ");
@@ -136,7 +136,7 @@ delete() {
   my_read(input,0x15);
   iVar2 = atoi(input);
   do {
-    if (local_38 == (undefined4 *)0x0) {                     // If we are at the end of myCart exit
+    if (runner == (undefined4 *)0x0) {                       // If we are at the end of myCart exit
 LAB_08048a5e:
       if (canary != *(int *)(in_GS_OFFSET + 0x14)) {
         __stack_chk_fail();
@@ -144,19 +144,19 @@ LAB_08048a5e:
       return;
     }
     if (counter == iVar2) {                                  // if we match the product to delete 
-      iVar2 = local_38[2];                                   // iVar2 is the next product in linked list
-      iVar1 = local_38[3];                                   // iVar1 is the prev product in linked list
+      iVar2 = runner->fwd;                                   // iVar2 is the next product in linked list
+      iVar1 = runner->bwd;                                   // iVar1 is the prev product in linked list
       if (iVar1 != 0) {
         *(int *)(iVar1 + 8) = iVar2;                         // set the prev product next ptr to next product
       }
       if (iVar2 != 0) {
         *(int *)(iVar2 + 0xc) = iVar1;                       // set the next product prev ptr to prev product
       }
-      printf("Remove %d:%s from your shopping cart.\n",counter,*local_38);
+      printf("Remove %d:%s from your shopping cart.\n", counter, *runner);
       goto LAB_08048a5e;
     }
     counter += 1;
-    local_38 = (undefined4 *)local_38[2];
+    runner = (product *)runner->fwd;
   } while( true );
 }
 
@@ -166,7 +166,7 @@ int cart() {
   int local_30;
   undefined4 *local_2c;
   char local_26 [22];                                        // input buffer
-  int local_10 = *(int *)(in_GS_OFFSET + 0x14);
+  int canary = *(int *)(in_GS_OFFSET + 0x14);                // canary 
   local_34 = 1;
   local_30 = 0;
   printf("Let me check your cart. ok? (y/n) > ");
@@ -181,7 +181,7 @@ int cart() {
       local_34 = local_34 + 1;                               // increment item number
     }
   }
-  if (local_10 != *(int *)(in_GS_OFFSET + 0x14)) {
+  if (canary != *(int *)(in_GS_OFFSET + 0x14)) {
     __stack_chk_fail();
   }
   return local_30;                                           // return total price of all products in cart
@@ -207,11 +207,21 @@ checkout() {
   return;
 }
 
-           checkout()               delete()
+
+┌─────────┐
+| Exploit |
+└─────────┘
+ASLR, Canary, NX, PARTIAL RELRO
+
+checkout() adds a product to myCart but not allocated in memory but on the stack. Because the linked list myCart points to
+this object, after checkout() stack frame is removed and lets say delete() stack frame is added it will overlap. Specifically
+the input buffer will overlap with the product allowing direct modification of the product fwd and bkd pointers.
+
+           checkout()               delete(), cart() & handler
     High  ┌─────────────────┐      ┌─────────────────┐
-          | return address  |      | return address  |
+          | return address  |      | return address  |    environ - 0x100
           ├─────────────────┤      ├─────────────────┤
-          | frame pointer   |      | frame pointer   | 
+          | frame pointer   |      | frame pointer   |    environ - 0x104 
           ├─────────────────┤      ├─────────────────┤
           | ...             |      | ...             |
           ├─────────────────┤      ├─────────────────┤
@@ -229,20 +239,56 @@ checkout() {
           ├─────────────────┤      |                 |
           | product.name    |      |                 |
           ├─────────────────┤      |        ┌────────┤
-          | ...             |      |        | ...    |
+          | ...             |      |        | ...    |     offset from the start of input to frame pointer is 34 bytes 0x22
           ├─────────────────┤      ├────────┴────────┤
           | total           |      | ...             | 
      Low  └─────────────────┘      └─────────────────┘
           
+Write primitive
+delete() mirrors unsafe unlink. Assuming that runner is the stack based iphone 8 - then next & prev I control.
 
+  fd = runner->fwd; 
+  bk = runner->bwd;
+  if (bk != 0) {
+    bk + 0x8 = fw;                                            // Write next to (prev + 0x8)
+  }
+  if (fw != 0) {
+    fw + 0xc = bk;                                            // Write prev to (next + 0xc)
+  }
 
-┌─────────┐
-| Exploit |
-└─────────┘
-ASLR, Canary, NX
+Info leak primitive
+After stack based product has been added an info leak becomes feasible. cart() iterates through myCart and prints out 
+item name and value. The name can be modified to point to GOT of puts. This would mean we can de randomize libc and find
+offsets for system and binsh string. 
 
+puts@GOT 0804b028 
+when calling cart and the input y/n for checking the cart, pass y with other strings such that product.name = puts@GOT. The 
+leaked value will thus be puts address and libc base address can be found
 
-(remote) gef➤  x/4wx 0x90a58a8
-0x90a58a8:      0x090a58c0      0x0000012b      0x00000000      0x090a5890
+After using info leak to get libc base we can find the stack and leaking environ. 
+From testing it appears that environ is 0x100 from the return address of any frame pointer above handler (called by handler). 
+Just like libc leak, find the offset of environ and with the libc_base the actual address of environ. Overwriting product.name 
+with environ will leak the environ which will be placed above all the stack frames. Using constant difference of around 0x100 
+will mean that we can get the exact address of any variable in the stack
 
-The last added stack based product is 0xffb5c288
+$ readelf -Ws libc.so.6| grep 'environ'
+  1039: 001b1dbc     4 OBJECT  WEAK   DEFAULT   33 environ@@GLIBC_2.0
+
+Overwrite the GOT entry for atoi to system. This allows the user input in handler or whatever to just be system(input). This
+allows opening the shell. However for this write primitive the write is two way memory swap. So one address at atoi GOT, and 
+the other at system() does not work because it will attempt to write to system which is libc. To work around this, have 
+
+0804b040  atoi@GLIBC_2.0
+fd = ebp - 0xc and bk = atoi@GOT + 0x22
+  - delete() saved ebp = atoi@GOT + 0x22
+  - atoi@GOT + 0x30 = saved ebp (doesn't matter)
+
+A key insight is that this is assuming all local variables are accessed by the base pointer, ebp - in this case it is. So stack
+frame pivoting works to ensure unsafe unlink write ends up as simple write.
+
+This means that now ebp is somewhere in GOT for handler() frame after delete returns. Thus when my_read() happens with input, 
+it will write to ebp + 0x22 which is directly in the atoi GOT. Therefore the input should be 
+system addr + bin sh addr
+
+FLAG{I_th1nk_th4t_you_c4n_jB_1n_1ph0n3_8}
+
