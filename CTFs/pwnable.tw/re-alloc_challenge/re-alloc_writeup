@@ -8,9 +8,185 @@ chmod +x pwninit
 ./pwninit --bin re-alloc --libc libc.so.6
 
 
+main() {
+  long in_FS_OFFSET;
+  int input = 0;
+  undefined8 local_10 = *(undefined8 *)(in_FS_OFFSET + 0x28);
+  init_proc();
+  do {
+    menu();                                                  // prints menu
+    __isoc99_scanf(&DAT_0040212f,&input);
+    if (input == 1)
+      allocate();                                            // input = 1 -> allocate()
+    if (input == 2) 
+      reallocate();                                          // input = 2 -> reallocate()
+    if (input == 3) 
+      rfree();                                               // input = 3 -> rfree()
+    if (input == 4)
+      _exit(0);                                              // input = 4 -> exit()
+    else {
+      puts("Invalid Choice");
+    }
+  } while( true );
+}
+
+
+allocate() {
+  ulong index;
+  ulong __size;
+  void *pvVar2;
+  long lVar3;
+  printf("Index:");
+  index = read_long();                                       // read index
+  if ((index < 2) && (*(long *)(heap[index]) == 0)) {        // index index must be {0,1}. index must also be empty
+    printf("Size:");
+    __size = read_long();                                    // read size
+    if (__size < 0x79) {                                     // size must be less than 121
+      pvVar2 = realloc((void *)0x0,__size);                  // malloc __size 
+      if (pvVar2 == (void *)0x0) {
+        puts("alloc error");
+      }
+      else {                                                 // memory allocated correctly
+        *(void **)(heap[index]) = pvVar2;                    // insert pointer into heap array
+        printf("Data:");
+        lVar3 = read_input(heap[index],__size & 0xffffffff); // read data into allocated memory 
+        *(undefined1 *)(lVar3 + *(long *)(pvVar2)) = 0;
+      }
+    }
+    else {
+      puts("Too large!");
+    }
+  }
+  else {
+    puts("Invalid !");
+  }
+  return;
+}
+
+
+reallocate() {
+  ulong index;
+  ulong __size;
+  void *pvVar2;
+  printf("Index:");
+  index = read_long();                                       // read index
+  if ((index < 2) && (*(long *)(heap[index]) != 0)) {        // index must be {0,1} and heap[index] must have something in it
+    printf("Size:");
+    __size = read_long();                                    // read size
+    if (__size < 0x79) {                                     // size must be less than 121
+      pvVar2 = realloc(*(void **)(heap[index]),__size);      // realloc heap[index] with size 
+      if (pvVar2 == (void *)0x0) {
+        puts("alloc error");
+      }
+      else {                                                 // memory re-allocated correctly
+        heap[index] = pvVar2;                                // set new pointer into heap index
+        printf("Data:");
+        read_input(heap[index],__size & 0xffffffff);         // read data into new re-allocated memory
+      }
+    }
+    else {
+      puts("Too large!");
+    }
+  }
+  else {
+    puts("Invalid !");
+  }
+  return;
+}
+
+
+rfree(){
+  ulong index;
+  printf("Index:");
+  index = read_long();                                       // read index 
+  if (index < 2) {                                           // index must be {0,1} 
+    realloc(heap[index],0);                                  // UB? free?
+    *(undefined8 *)(heap[index]) = 0;                        // set heap to 0/remove the old pointer
+  }
+  else {
+    puts("Invalid !");
+  }
+  return;
+}
+
+
 ┌─────────┐
 | Exploit |
 └─────────┘
-ASLR, Canary, NX, Partial RELRO
+ASLR, Canary, NX, Partial RELRO, GLIBC 2.29
+
+Double free detected when allocating, followed by realloc of size 0 twice
+When realloc with size 0 - it fails to set heap[index] = 0x0 (return value of realloc) because return value is 0x0 so it errors
+out and exits early
+
+GLIBC 2.29 hardened tcache 
+struct tcache_entry {
+  struct tcache_entry *next;
+  struct tcache_perthread_struct *key;       // exists to detect double frees 
+} 
+The tcache_entry overlaps with malloc_chunk
+
+in free() - security updates to 
+if (__glibc_unlikely (e->key == tcache) {    // Detect double frees
+  ...
+  malloc_printerr ("free(): double free detected in tcache 2");
+}
+
+1. alloc(index=0, size=64, data=AAAA)                // chunk_A allocated 
+2. realloc(index=0, size=0)                          // chunk_A freed, ptr to chunk_A still referencable (UAF)
+3. realloc(index=0. size=64, data=AAAAAAAABBBBBBBB)  // chunk_A returned in a freed state, gives write ability into tcache_entry
+// 4. realloc(index=0, size=0)                          // chunk_A is double freed - GLIBC 2.29 mitigation is passed 
+
+The reason this works is that realloc(ptr, size) when given size > 0 and less than original size simply checks the existing size
+of the chunk. Because the old chunk size is enough to satisfy the request - it just returns the same ptr value back. realloc does
+not check if the chunk was already in tcache 'freed state'. So realloc does not affect the freed state of the chunk.
+
+Arbitrary write
+In step 3 overwrite both the *next and *key entries in tcache_entry for chunk_A in tcache. The *next gives the next addr to return
+as the chunk. Thus 2 allocations are required - first one chunk_A then target (overwritten *next)
+  Tcache: chunk_A -> sabotaged *next
+  heap (var): [chunk_A dangling pointer, 0x0]
+
+However simply allocating does not work. allocating index 1 means that the heap list is full and further allocations are not 
+feasible. We cannot free either index 0 which holds the dangling pointer nor index 1 which holds chunk_A.
+
+In order to allocate twice - with the restrictions of the program, we can do the following. index 1 allocates chunk_A. The tcache 
+is now only pointing to the sabotaged *next. We can realloc index 1 to a larger size and then free index 1. This puts chunk back
+into tcache but not into the size of chunk_A and the sabotaged *next. Index 1 can then alloc the same size as chunk_A which returns
+the sabotaged *next value. 
 
 
+Leak
+There is no print option with user input available. However the binary is partial RELRO and we have arbitrary write. So what if we 
+overwrite GOT entry of a function to the plt of the printf. atoll seems like a good bet.
+atoll@got -> printf@plt
+
+Because we need to identify libc use the following to just mass print what in stack will be valuable data
+for i in range(1, 41):
+	free(f"%{i}$p".encode())
+	data = p.recvuntil(b'Invalid !')
+	print(f"{i}: {data}")
+
+libc vmmap [0x7f841a687000 - 0x7f841a86e000]
+gef➤  x/64wx $rsp
+0x7ffd157df890: 0x0000001b      0x00000000      0x1a86c760      0x00007f84  <-- 2nd from the stack is addr in libc
+0x7ffd157df8a0: 0x24323125      0x00000a70      0x1a70ae4a      0x00007f84
+This corresponds to the 7th arg which is 0x7f841a86c760 _IO_2_1_stdout_
+_IO_2_1_stdout has offset of 0x1e5760 from libc base
+
+Exploit
+First attempt was to overwrite simply leveraging the format string vulnerability... But this has a problem which is read_long. It
+restricts the input or any format string payload to 16 bytes.
+
+Well then attempt to write to another target like _exit instead. The overwrite would have to be done in sections
+The options include ROP chain which requries a stack leak and a whole lot of work. Perhaps one gadget can be found
+
+The following gadget can be used
+e2383:       48 89 ce                mov    rsi,rcx
+e2386:       48 8d 3d f7 d7 0c 00    lea    rdi,[rip+0xcd7f7]        # 1afb84 (/bin/sh)
+e238d:       e8 be f5 ff ff          call   e1950 <execve@@GLIBC_2.2.5>
+
+Paint the one_gadget address over the exit got a byte at a time and leverage a stack pointer to do it. 
+
+
+FLAG{r3all0c_the_memory_r3all0c_the_sh3ll}
