@@ -1,0 +1,115 @@
+
+┌─────────────┬───────────────────────────[ re-alloc Writeup ]──────────────────────────────────────────
+| Description |
+└─────────────┘
+Leverage pwninit to get the correct ld (rename libc so file to libc.so.6) 
+wget -O pwninit https://github.com/io12/pwninit/releases/download/3.3.0/pwninit
+chmod +x pwninit
+./pwninit --bin tcache_tear --libc libc.so.6
+
+
+void main(void)
+
+{
+   long lVar1;
+   uint local_c;
+   
+   FUN_00400948();
+   printf("Name:");
+   FUN_00400a25(&DAT_00602060,0x20);
+   local_c = 0;
+   do {
+       while( true ) {
+           while( true ) {
+              menu();
+              lVar1 = read_long();
+              if (lVar1 != 2) break;
+              if (local_c < 8) {
+                  free(DAT_00602088);
+                  local_c = local_c + 1;
+              }
+           }
+           if (2 < lVar1) break;
+           if (lVar1 == 1) {
+              allocate();
+           }
+           else {
+LAB_00400c75:
+              puts("Invalid choice");
+           }
+       }
+       if (lVar1 != 3) {
+           if (lVar1 == 4) {
+              exit(0);
+           }
+           goto LAB_00400c75;
+       }
+       info();
+   } while( true );
+}
+
+void allocate(void) {
+   ulong __size;
+   
+   printf("Size:");
+   __size = read_long();
+   if (__size < 0x100) {
+       DAT_00602088 = malloc(__size);
+       printf("Data:");
+       FUN_00400a25(DAT_00602088,(int)__size + -0x10);
+       puts("Done !");
+   }
+   return;
+}
+
+
+
+void FUN_00400a25(long param_1,undefined4 param_2)
+
+{
+   int iVar1;
+   
+   iVar1 = __read_chk(0,param_1,param_2,param_2);
+   if (iVar1 < 1) {
+       puts("read error");
+                                     /* WARNING: Subroutine does not return */
+       _exit(1);
+   }
+   if (*(char *)(param_1 + (long)iVar1 + -1) == '\n') {
+       *(undefined1 *)(param_1 + (long)iVar1 + -1) = 0;
+   }
+   return;
+}
+
+
+void info(void) {
+   printf("Name :");
+   write(1,&DAT_00602060,0x20);
+   return;
+}
+
+
+longlong read_long(void)
+
+{
+   longlong lVar1;
+   long in_FS_OFFSET;
+   char local_28 [24];
+   long local_10;
+   
+   local_10 = *(long *)(in_FS_OFFSET + 0x28);
+   __read_chk(0,local_28,0x17,0x18);
+   lVar1 = atoll(local_28);
+   if (local_10 != *(long *)(in_FS_OFFSET + 0x28)) {
+                                     /* WARNING: Subroutine does not return */
+       __stack_chk_fail();
+   }
+   return lVar1;
+}
+
+
+┌─────────┐
+| Exploit |
+└─────────┘
+Full RELRO, Canary, NX, ASLR, stripped 
+
