@@ -1,0 +1,166 @@
+
+┌─────────────┬───────────────────────────[ tcache tear Writeup ]──────────────────────────────────────────
+| Description |
+└─────────────┘
+Leverage pwninit to get the correct ld (rename libc so file to libc.so.6) 
+wget -O pwninit https://github.com/io12/pwninit/releases/download/3.3.0/pwninit
+chmod +x pwninit
+./pwninit --bin tcache_tear --libc libc.so.6
+
+For debugging to find main - find entry point using info file
+x/20i <entry point>
+Look for the call <addr> (this is __libc_start_main)
+continue into it. the argument for main's addr is an arg
+In this case there is no pie so breakpoints can be set at the address
+
+
+the buffer DAT_00602088 holds pointer to which holds every chunk
+global var name   = 0x0602060;
+global var buffer = 0x0602088;
+main() {                                                     // 0x400bc7
+  long input;
+  uint counter;
+  FUN_00400948();                                            // Setup function, alarm, setvbuf
+  printf("Name:");
+  read_char_array(&DAT_00602060,0x20);                       // read char array
+  counter = 0;
+  while( true ) {
+    menu();
+    input = read_long();                                     // read input
+    if (input == 1) { allocate(); }                          // if 1 -> allocate()
+    if (input == 2 && counter < 8) {                         // if 2 -> free()
+      free(DAT_00602088);
+      counter += 1;
+    }
+    if (input == 3) { info(); }                              // if 3 -> info()
+    if (input == 4) { exit(0); }                             // if 4 -> exit()
+    else { puts("Invalid choice"); }                         // else -> print error
+   } while( true );
+}
+
+allocate() {                                                 // 0x400b14
+  ulong __size;
+  printf("Size:");
+  __size = read_long();                                      // read size
+  if (__size < 0x100) {                                      // size must be less than 256
+    DAT_00602088 = malloc(__size);                           // allocate 256 bytes
+    printf("Data:");
+    read_char_array(DAT_00602088,(int)__size + -0x10);       // read data into global buffer - 16 bytes
+    puts("Done !");
+  }
+  return;
+}
+
+info() {                                                     // 0x400b99
+  printf("Name :");
+  write(1,&DAT_00602060,0x20);                               // write name of 32 bytes
+  return;
+}
+
+read_char_array(long param_1,undefined4 param_2) {           // 0x400a25 
+  int iVar1;   
+  iVar1 = __read_chk(0,param_1,param_2,param_2);             // read into param_1 of param_2
+  if (iVar1 < 1) {
+    puts("read error");
+    _exit(1);
+  }
+  if (*(char *)(param_1 + (long)iVar1 + -1) == '\n') {
+    *(undefined1 *)(param_1 + (long)iVar1 + -1) = 0;
+  }
+  return;
+}
+
+longlong read_long() {                                       // 0x4009c4
+  longlong lVar1;
+  long in_FS_OFFSET;
+  char local_28 [24];
+  long local_10;
+  local_10 = *(long *)(in_FS_OFFSET + 0x28);
+  __read_chk(0,local_28,0x17,0x18);
+  lVar1 = atoll(local_28);
+  if (local_10 != *(long *)(in_FS_OFFSET + 0x28)) {
+    __stack_chk_fail();
+  }
+  return lVar1;
+}
+
+
+┌─────────┐
+| Context |
+└─────────┘
+There is a UAF in buffer pointer at 0x602088 
+Double free: allocate(chunk_A), free(), free()
+
+For GLIBC 2.27 there was no key field in tcache_entry which meant no detection of double free
+```
+  typedef struct tcache_entry
+  {
+    struct tcache_entry *next;
+  } tcache_entry;
+
+  typedef struct tcache_perthread_struct
+  {  
+    char counts[TCACHE_MAX_BINS];
+    tcache_entry *entries[TCACHE_MAX_BINS];
+  } tcache_perthread_struct;
+
+  struct malloc_chunk {
+    INTERNAL_SIZE_T      mchunk_prev_size;  /* Size of previous chunk (if free).  */
+    INTERNAL_SIZE_T      mchunk_size;       /* Size in bytes, including overhead. */
+    struct malloc_chunk* fd;         /* double links -- used only if free. */
+    struct malloc_chunk* bk;
+  };
+```
+
+A chunk has multiple states - (malloc_chunk struct) for managing memory internally and (tcache_entry struct) if placed in tcache 
+
+      malloc_chunk           tcache_entry
+      ┌──────────────────┐   ┌──────────────────┐
+0x00  | mchunk_prev_size |   | ...              |
+      ├──────────────────┤   ├──────────────────┤
+0x08  | mchunk_size      |   | ...              |
+      ├──────────────────┤   ├──────────────────┤
+0x10  | buffer/data      |   | *next            |
+      ├──────────────────┤   ├──────────────────┤
+...   | ...              |   | ...              |
+      └──────────────────┘   └──────────────────┘
+
+
+┌─────────┐
+| Exploit |
+└─────────┘
+Full RELRO, Canary, NX, ASLR, stripped, GLIBC 2.27, 64 bit
+
+Abusing the (UAF) double free to get a write primitive:
+  1. allocate chunk_A 
+    tcache->entries[idx] = NULL
+    tcache->counts[idx] = 0
+  
+  2. free chunk_A
+    tcache->entries[idx] = chunk_A → NULL
+    tcache->counts[idx] = 1
+    Tcachebins[idx=1, size=0x30, count=1] ← Chunk(A)
+  
+  3. free chunk_A
+    tcache->entries[idx] = chunk_A → chunk_A 
+    Tcachebins[idx=1, size=0x30, count=1] ← Chunk(A) ← Chunk(A) → [loop detected]
+    tcache->counts[idx] = 2
+
+  4. allocate chunk_A 
+    tcache->entries[idx] = chunk_A 
+    tcache->counts[idx] = 1
+    Tcachebins[idx=1, size=0x30, count=1] ←  Chunk(A)  ←  [Corrupted chunk at chunk_A]
+
+  5. Write to chunk_A
+    tcache->entries[idx] = chunk_A → target
+
+  6. allocate chunk_A 
+    tcache->entries[idx] = whatever written to chunk_A buffer
+    tcache->counts[idx] = 0 
+    [!] Command 'heap bins tcache' failed to execute properly, reason: Cannot access memory at address <garbage addr>
+
+  7. allocate & write 
+    This achieves arbitrary write to address written by attacker
+
+Because the binary is no PIE, the text data and BSS are at fixed addresses
+
