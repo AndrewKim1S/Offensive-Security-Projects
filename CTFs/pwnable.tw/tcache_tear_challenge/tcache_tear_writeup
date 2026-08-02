@@ -45,7 +45,7 @@ allocate() {                                                 // 0x400b14
   if (__size < 0x100) {                                      // size must be less than 256
     DAT_00602088 = malloc(__size);                           // allocate 256 bytes
     printf("Data:");
-    read_char_array(DAT_00602088,(int)__size + -0x10);       // read data into global buffer - 16 bytes
+    read_char_array(DAT_00602088, (int)__size + -0x10);      // read data into global buffer of size - 16 bytes
     puts("Done !");
   }
   return;
@@ -88,9 +88,6 @@ longlong read_long() {                                       // 0x4009c4
 ┌─────────┐
 | Context |
 └─────────┘
-There is a UAF in buffer pointer at 0x602088 
-Double free: allocate(chunk_A), free(), free()
-
 For GLIBC 2.27 there was no key field in tcache_entry which meant no detection of double free
 ```
   typedef struct tcache_entry
@@ -109,6 +106,9 @@ For GLIBC 2.27 there was no key field in tcache_entry which meant no detection o
     INTERNAL_SIZE_T      mchunk_size;       /* Size in bytes, including overhead. */
     struct malloc_chunk* fd;         /* double links -- used only if free. */
     struct malloc_chunk* bk;
+    /* Only used for large blocks: pointer to next larger size.  */
+    struct malloc_chunk* fd_nextsize; /* double links -- used only if free. */
+    struct malloc_chunk* bk_nextsize;
   };
 ```
 
@@ -125,12 +125,52 @@ A chunk has multiple states - (malloc_chunk struct) for managing memory internal
 ...   | ...              |   | ...              |
       └──────────────────┘   └──────────────────┘
 
+In the heap allocator, the unsorted bin (and small/large bins) use a doubly linked list to store malloc chunks. This is done
+through the fd and bk pointers. The head of the doubly linked list in the unsorted bin is main_arena (resides in .data or .bss) of
+libc. 
+Unsorted bin: HEAD (main_arena) ↔ CHUNK_A ↔ HEAD (main_arena)
+
+free() or _int_free() for unsorted bin on GLIBC 2.27 looks like the following
+```
+static void
+_int_free(mstate av, mchunk_ptr p, int have_lock) {
+  ...
+  if (!prev_inuse(p)) {
+    // Consolidate backwards by checking current chunk's PREV_INUSE bit
+  }
+  if (nextchunk != av->top) {
+    // Consolidate forwards 
+
+    bck = unsorted_chunks(av);
+    fwd = bck->fd;
+    if (__glibc_unlikely (fwd->bk != bck))
+      malloc_printerr ("free(): corrupted unsorted chunks");
+    p->fd = fwd;
+    p->bk = bck;
+    if (!in_smallbin_range(size)) {
+      p->fd_nextsize = NULL;
+      p->bk_nextsize = NULL;
+    }
+    bck->fd = p;
+    fwd->bk = p;
+
+    set_head(p, size | PREV_INUSE);
+    set_foot(p, size);
+    check_free_chunk(av, p);
+  }
+  // else if the chunk borders the current high end of memory then consolidate into top
+  ...
+}
+```
 
 ┌─────────┐
 | Exploit |
 └─────────┘
 Full RELRO, Canary, NX, ASLR, stripped, GLIBC 2.27, 64 bit
+There is a UAF in buffer pointer at 0x602088 
+Double free: allocate(chunk_A), free(), free()
 
+# Arbitrary Write
 Abusing the (UAF) double free to get a write primitive:
   1. allocate chunk_A 
     tcache->entries[idx] = NULL
@@ -162,5 +202,52 @@ Abusing the (UAF) double free to get a write primitive:
   7. allocate & write 
     This achieves arbitrary write to address written by attacker
 
-Because the binary is no PIE, the text data and BSS are at fixed addresses
+# Leak Libc
+Because the binary is no PIE, the text data and BSS are at fixed addresses. The overwrite target can thus be name global buffer 
+(0x602060) Also consider that the only address that we can print out is the name global buffer.
+Craft a chunk at (0x602060). Then free it into the unsorted bin and then read it. 
+- The crafted chunk must be size of 0x410 bytes on 64-bit to ensure that it does not go into (Tcache 0x408 max, Fastbins 0x80 max) 
+- Target forged chunk at 0x602050/0x602060 - the PREV_INUSE flag must be on (prevent coalescing with previous)
+- Forge another chunk after target - PREV_INUSE flag must be on (confirm that target chunk isn't garbage)
+- Forge another chunk after (3rd) - PREV_INUSE flag must be on (prevent coalescing with next chunk (first fake chunk) - unlink) 
+
+          ┌─────────────┐
+0x602050  | prev_size   |  0x0   Forged Chunk
+          ├─────────────┤
+0x602058  | mchunk_size |  0x420 | PREV_INUSE 
+          ├─────────────┤
+0x602060  | DATA        |  AAAA...
+          | ...         |
+          ├─────────────┤
+0x602088  | buffer ptr  |  0x602060     This is the name buffer. So when I free fake chunk - the fake chunk matches data addr etc
+          ├─────────────┤
+          |  ...        |
+          ├─────────────┤
+0x602470  | prev_size   |  0x0
+          ├─────────────┤
+0x602478  | mchunk_size |  0x20 | PREV_INUSE - 0x20 is minimum buffer size
+          ├─────────────┤
+0x602480  | DATA        |  AAAA.... 
+          | ...         |
+          ├─────────────┤
+0x602490  | prev_size   |  0x0
+          ├─────────────┤
+0x602498  | mchunk_size |  0x20 | PREV_INUSE 
+          └─────────────┘
+
+This crafted chunk must be written with multiple arbitrary writes because the chunk size is too large
+  1st arbitrary write: [0x602470 - 0x602498] 0x28 bytes
+  2nd arbitrary write: [0x602050 - 0x602088] 0x38 bytes
+Afterwards this forged chunk must be freed call free() which will free(0x602088 -> 0x602060) This should end up in the unsorted bin
+
+
+ "free(): invalid pointer",
+
+
+
+
+The arbitrary the write can be used to overwrite the __free_hook funcptr variable (with either custom ROP Chain, or one gadget)
+
+free() can be called a maximum of 8 times. 1 arbitrary write through tcache poisoning is 2 frees
+  4 (arbitrary writes for forging chunks) + 1 (free the forged chunk) + 2 (arbitrary write for __free_hook) + 1 (trigger shell)
 

