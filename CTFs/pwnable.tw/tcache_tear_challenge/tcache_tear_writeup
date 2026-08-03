@@ -236,18 +236,21 @@ Craft a chunk at (0x602060). Then free it into the unsorted bin and then read it
           └─────────────┘
 
 This crafted chunk must be written with multiple arbitrary writes because the chunk size is too large
-  1st arbitrary write: [0x602470 - 0x602498] 0x28 bytes
-  2nd arbitrary write: [0x602050 - 0x602088] 0x38 bytes
+  1st arbitrary write: [0x602470 - 0x602498] 0x30 bytes
+  2nd arbitrary write: [0x602050 - 0x602088] 0x40 bytes
 Afterwards this forged chunk must be freed call free() which will free(0x602088 -> 0x602060) This should end up in the unsorted bin
+[+] unsorted_bins[0]: fw=0x602050, bk=0x602050
+ → Chunk(addr=0x602060, size=0x420, flags=PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA)
 
+The name buffer can then be printed which will include the libc value for main_arena. This can be used to find libc base addr
+Ex: 0x7fa56e3ebca0 (leak) - 0x7fa56e000000 (libc base) = 0x3ebca0 (leak offset)
 
- "free(): invalid pointer",
-
-
-
-
-The arbitrary the write can be used to overwrite the __free_hook funcptr variable (with either custom ROP Chain, or one gadget)
+# Triggering Shell
+The arbitrary the write can be used to overwrite the __free_hook funcptr variable with the address of system. When free() is called
+it will execute system and as long as the string /bin/sh is in the content it should pop a shell
 
 free() can be called a maximum of 8 times. 1 arbitrary write through tcache poisoning is 2 frees
   4 (arbitrary writes for forging chunks) + 1 (free the forged chunk) + 2 (arbitrary write for __free_hook) + 1 (trigger shell)
 
+
+FLAG{tc4ch3_1s_34sy_f0r_y0u}
