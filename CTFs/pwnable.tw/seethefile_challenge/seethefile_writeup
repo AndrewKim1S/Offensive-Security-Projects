@@ -1,0 +1,128 @@
+
+┌─────────────┬───────────────────────────[ seethefile Writeup ]──────────────────────────────────────────
+| Description |
+└─────────────┘
+Leverage pwninit to get the correct ld (rename libc so file to libc.so.6) 
+wget -O pwninit https://github.com/io12/pwninit/releases/download/3.3.0/pwninit
+chmod +x pwninit
+./pwninit --bin seethefile --libc libc.so.6
+
+main() {
+  int iVar1;
+  int in_GS_OFFSET;
+  EVP_PKEY_CTX *in_stack_ffffffc0;
+  char local_34 [32];
+  undefined4 local_14;
+  undefined1 *puStack_c;
+  puStack_c = &stack0x00000004;
+  local_14 = *(undefined4 *)(in_GS_OFFSET + 0x14);
+  init(in_stack_ffffffc0);
+  welcome();
+  do {
+    menu();
+    __isoc99_scanf(&DAT_08048dd9,local_34);
+    iVar1 = atoi(local_34);
+    switch(iVar1) {
+    default:
+      puts("Invaild choice");
+      exit(0);
+    case 1:
+      openfile();
+      break;
+    case 2:
+      readfile();
+      break;
+    case 3:
+      writefile();
+      break;
+    case 4:
+      closefile();
+      break;
+    case 5:
+      printf("Leave your name :");
+      __isoc99_scanf(&DAT_08048dd9,name);
+      printf("Thank you %s ,see you next time\n",name);
+      if (fp != (FILE *)0x0) {
+        fclose(fp);
+      }
+      exit(0);
+    }
+  } while( true );
+}
+
+int openfile() {
+  int iVar1;
+  char *pcVar2;
+  if (fp == (FILE *)0x0) {
+    memset(magicbuf,0,400);
+    printf("What do you want to see :");
+    __isoc99_scanf(&DAT_08048c03,filename);
+    pcVar2 = strstr(filename,"flag");
+    if (pcVar2 != (char *)0x0) {
+      puts("Danger !");
+      exit(0);
+    }
+    fp = fopen(filename,"r");
+    if (fp == (FILE *)0x0) {
+      iVar1 = puts("Open failed");
+    }
+    else {
+      iVar1 = puts("Open Successful");
+    }
+  }
+  else {
+    puts("You need to close the file first");
+    iVar1 = 0;
+  }
+  return iVar1;
+}
+
+readfile() {
+  size_t sVar1;
+  memset(magicbuf,0,400);
+  if (fp == (FILE *)0x0) {
+    puts("You need to open a file first");
+  }
+  else {
+    sVar1 = fread(magicbuf,399,1,fp);
+    if (sVar1 != 0) {
+      puts("Read Successful");
+    }
+  }
+  return;
+}
+
+writefile() {
+  char *pcVar1;
+  pcVar1 = strstr(filename,"flag");
+  if (pcVar1 == (char *)0x0) {
+    pcVar1 = strstr(magicbuf,"FLAG");
+    if (pcVar1 == (char *)0x0) {
+      pcVar1 = strchr(magicbuf,0x7d);
+      if (pcVar1 == (char *)0x0) {
+        puts(magicbuf);
+        return;
+      }
+    }
+  }
+  puts("you can\'t see it");
+  exit(1);
+}
+
+closefile() {
+  if (fp == (FILE *)0x0) {
+    puts("Nothing need to close");
+  }
+  else {
+    fclose(fp);
+  }
+  fp = (FILE *)0x0;
+  return;
+}
+
+
+┌─────────┐
+| Exploit |
+└─────────┘
+ASLR, NX, Partial RELRO, 32 bit
+
