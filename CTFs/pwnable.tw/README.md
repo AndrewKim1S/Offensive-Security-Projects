@@ -9,5 +9,6 @@
 - [200] silver bullet
 - [200] applestore
 - [200] re-alloc 
+- [200] tcache tear
 
-Total score: 1500
+Total score: 1700
