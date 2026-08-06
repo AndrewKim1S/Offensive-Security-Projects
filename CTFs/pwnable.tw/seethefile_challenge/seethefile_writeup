@@ -11,7 +11,7 @@ main() {
   int iVar1;
   int in_GS_OFFSET;
   EVP_PKEY_CTX *in_stack_ffffffc0;
-  char local_34 [32];
+  char input [32];
   undefined4 local_14;
   undefined1 *puStack_c;
   puStack_c = &stack0x00000004;
@@ -20,26 +20,26 @@ main() {
   welcome();
   do {
     menu();
-    __isoc99_scanf(&DAT_08048dd9,local_34);
-    iVar1 = atoi(local_34);
+    __isoc99_scanf(&DAT_08048dd9, input);                    // get input 
+    iVar1 = atoi(input);
     switch(iVar1) {
     default:
       puts("Invaild choice");
-      exit(0);
+      exit(0);                                               // Invalid choice -> exit()
     case 1:
-      openfile();
+      openfile();                                            // 1 -> openfile()
       break;
     case 2:
-      readfile();
+      readfile();                                            // 2 -> readfile()
       break;
     case 3:
-      writefile();
+      writefile();                                           // 3 -> writefile()
       break;
     case 4:
-      closefile();
+      closefile();                                           // 4 -> closefile()
       break;
     case 5:
-      printf("Leave your name :");
+      printf("Leave your name :");                           // 5 -> get name, print name, close file, exit()
       __isoc99_scanf(&DAT_08048dd9,name);
       printf("Thank you %s ,see you next time\n",name);
       if (fp != (FILE *)0x0) {
@@ -53,16 +53,16 @@ main() {
 int openfile() {
   int iVar1;
   char *pcVar2;
-  if (fp == (FILE *)0x0) {
-    memset(magicbuf,0,400);
+  if (fp == (FILE *)0x0) {                                   // check that no files are open 
+    memset(magicbuf,0,400);                                  // memset magicbuf
     printf("What do you want to see :");
-    __isoc99_scanf(&DAT_08048c03,filename);
-    pcVar2 = strstr(filename,"flag");
+    __isoc99_scanf(&DAT_08048c03,filename);                  // get filename
+    pcVar2 = strstr(filename,"flag");                        // don't read anything that has flag in the name
     if (pcVar2 != (char *)0x0) {
       puts("Danger !");
       exit(0);
     }
-    fp = fopen(filename,"r");
+    fp = fopen(filename,"r");                                // open filename
     if (fp == (FILE *)0x0) {
       iVar1 = puts("Open failed");
     }
@@ -70,7 +70,7 @@ int openfile() {
       iVar1 = puts("Open Successful");
     }
   }
-  else {
+  else {                                                     // make sure file (fp) is empty
     puts("You need to close the file first");
     iVar1 = 0;
   }
@@ -79,12 +79,12 @@ int openfile() {
 
 readfile() {
   size_t sVar1;
-  memset(magicbuf,0,400);
-  if (fp == (FILE *)0x0) {
+  memset(magicbuf,0,400);                                    // memset magicbuf
+  if (fp == (FILE *)0x0) {                                   // check that file has been opened
     puts("You need to open a file first");
   }
   else {
-    sVar1 = fread(magicbuf,399,1,fp);
+    sVar1 = fread(magicbuf,399,1,fp);                        // read 399 bytes from fp to magicbuf
     if (sVar1 != 0) {
       puts("Read Successful");
     }
@@ -94,13 +94,13 @@ readfile() {
 
 writefile() {
   char *pcVar1;
-  pcVar1 = strstr(filename,"flag");
-  if (pcVar1 == (char *)0x0) {
-    pcVar1 = strstr(magicbuf,"FLAG");
-    if (pcVar1 == (char *)0x0) {
-      pcVar1 = strchr(magicbuf,0x7d);
-      if (pcVar1 == (char *)0x0) {
-        puts(magicbuf);
+  pcVar1 = strstr(filename,"flag");                          // check if filename includes flag 
+  if (pcVar1 == (char *)0x0) {                               // do not continue if the file has flag in the name
+    pcVar1 = strstr(magicbuf,"FLAG");                        // check if magicbuf includes flag
+    if (pcVar1 == (char *)0x0) {                             // do not continue if the magicbuf has flag 
+      pcVar1 = strchr(magicbuf,0x7d);                        // check if magicbuf includes 0x7d
+      if (pcVar1 == (char *)0x0) {                           // do not continue if the magicbuf has 0x7d
+        puts(magicbuf);                                      // print magicbuf
         return;
       }
     }
@@ -110,10 +110,10 @@ writefile() {
 }
 
 closefile() {
-  if (fp == (FILE *)0x0) {
+  if (fp == (FILE *)0x0) {                                   // check if a file is open
     puts("Nothing need to close");
   }
-  else {
+  else {                                                     // close file
     fclose(fp);
   }
   fp = (FILE *)0x0;
