@@ -40,7 +40,7 @@ main() {
       break;
     case 5:
       printf("Leave your name :");                           // 5 -> get name, print name, close file, exit()
-      __isoc99_scanf(&DAT_08048dd9,name);
+      __isoc99_scanf(&DAT_08048dd9,name);                    // Overflow
       printf("Thank you %s ,see you next time\n",name);
       if (fp != (FILE *)0x0) {
         fclose(fp);
@@ -120,9 +120,96 @@ closefile() {
   return;
 }
 
+┌─────────┐
+| Context |
+└─────────┘
+The /proc/self directory is special dynamic shortcut. Points to process ID and allows program to inspect its own status. Includes
+memory, absolute paths, file descriptors etc
+
+In the GLIBC 2.23 source code (https://elixir.bootlin.com/glibc.glibc-2.23/source)
+```
+stdio.h:48
+  typedef struct _IO_FILE FILE;
+stdio.h:127
+  # define fclose(fp) _IO_new_fclose(fp)
+
+libio.h:241
+  struct _IO_FILE {
+    int flags;
+    char* _IO_read_ptr;
+    char* _IO_read_end;
+    char* _IO_read_base;
+    char* _IO_write_base;
+    char* _IO_write_ptr;
+    char* _IO_write_end;
+    char* _IO_buf_base;
+    char* _IO_buf_end;
+    char* _IO_save_base;
+    char* _IO_backup_base;
+    char* _IO_save_end;
+
+    struct _IO_marker *_markers;
+    struct _IO_FILE *_chain;
+    int _fileno;
+    ...
+    _IO_lock_t *_lock;
+  }
+
+libioP.h:342
+  struct _IO_FILE_PLUS {
+    _IO_FILE file;
+    const struct _IO_jump_t *vtable
+  };
+libioP.h:307
+  struct _IO_jump_t {
+    JUMP_FIELD(size_t, __dummy);
+    JUMP_FIELD(size_t, __dummy2);
+    JUMP_FIELD(_IO_finish_t, __finish);                      // fclose()
+    JUMP_FIELD(_IO_overflow_t, __overflow);
+    JUMP_FIELD(_IO_underflow_t, __underflow);
+    JUMP_FIELD(_IO_uflow_t, __uflow);
+    JUMP_FIELD(_IO_pbackfail_t, __pbackfail);
+    JUMP_FIELD(_IO_xsputn_t, __xsputn);
+    JUMP_FIELD(_IO_xsgetn_t, __xsgetn);
+    JUMP_FIELD(_IO_seekoff_t, __seekoff);
+    JUMP_FIELD(_IO_seekpos_t, __seekpos);
+    JUMP_FIELD(_IO_setbuf_t, __setbuf);
+    JUMP_FIELD(_IO_sync_t, __sync);
+    JUMP_FIELD(_IO_doallocate_t, __doallocate);
+    JUMP_FIELD(_IO_read_t, __read);
+    JUMP_FIELD(_IO_write_t, __write);
+    JUMP_FIELD(_IO_seek_t, __seek);
+    JUMP_FIELD(_IO_close_t, __close);
+    JUMP_FIELD(_IO_stat_t, __stat);
+    JUMP_FIELD(_IO_showmanyc_t, __showmanyc);
+    JUMP_FIELD(_IO_imbue_t, __imbue); 
+  }
+
+iofclose.c:37
+  int _IO_new_fclose(_IO_FILE *fp) {
+    ...
+    _IO_FINISH(fp);                                          // Jump to __finish vtable
+    ...
+  }
+```
+
 
 ┌─────────┐
 | Exploit |
 └─────────┘
-ASLR, NX, Partial RELRO, 32 bit
+ASLR, NX, Partial RELRO, 32 bit, GLIBC 2.23
 
+Leak
+Because any file can be read and output to the terminal read /proc/self/maps - memory mapping of virtual memory for the process
+Repeating 2 (read) and 3 (write) we can move forward through the file and read the entire memory map for the process
+
+Overflow
+When inputting name - there is a buffer overflow at the last get name scanf (.data or .bss sections)
+  name is at 0x0804b260 (overtarget) - 32 bytes
+  fp   is at 0x0804b280 (overflow target) - 4 bytes to (fp + 0x4 [0x0804b284])
+  Forge File
+
+
+Using the Leaked vmmap arrange the overflow to the following
+  (A * 32) + (fp + 4) + (forged file)
+  where fp is 0x20 + .data or .bss section
