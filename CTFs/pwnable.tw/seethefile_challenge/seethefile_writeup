@@ -126,7 +126,7 @@ closefile() {
 The /proc/self directory is special dynamic shortcut. Points to process ID and allows program to inspect its own status. Includes
 memory, absolute paths, file descriptors etc
 
-In the GLIBC 2.23 source code (https://elixir.bootlin.com/glibc.glibc-2.23/source)
+In the GLIBC 2.23 source code https://elixir.bootlin.com/glibc/glibc-2.23/source
 ```
 stdio.h:48
   typedef struct _IO_FILE FILE;
@@ -134,7 +134,7 @@ stdio.h:127
   # define fclose(fp) _IO_new_fclose(fp)
 
 libio.h:241
-  struct _IO_FILE {
+  struct _IO_FILE {                                          // ?? bytes size 
     int flags;
     char* _IO_read_ptr;
     char* _IO_read_end;
@@ -147,21 +147,31 @@ libio.h:241
     char* _IO_save_base;
     char* _IO_backup_base;
     char* _IO_save_end;
-
     struct _IO_marker *_markers;
     struct _IO_FILE *_chain;
     int _fileno;
-    ...
+    int _flags2;
+  #if 0
+    int _blksize;
+  #else
+    int _flags2;
+  #endif
+    _IO_off_t _old_offset; 
+  #define __HAVE_COLUMN 
+    unsigned short _cur_column;
+    signed char _vtable_offset;
+    char _shortbuf[1];
     _IO_lock_t *_lock;
-  }
+  #ifdef _IO_USE_OLD_IO_FILE
+  };
 
 libioP.h:342
-  struct _IO_FILE_PLUS {
+  struct _IO_FILE_PLUS {                                     // ?? bytes size 
     _IO_FILE file;
     const struct _IO_jump_t *vtable
   };
 libioP.h:307
-  struct _IO_jump_t {
+  struct _IO_jump_t {                                        // 84 (0x54) bytes size
     JUMP_FIELD(size_t, __dummy);
     JUMP_FIELD(size_t, __dummy2);
     JUMP_FIELD(_IO_finish_t, __finish);                      // fclose()
@@ -187,9 +197,46 @@ libioP.h:307
 
 iofclose.c:37
   int _IO_new_fclose(_IO_FILE *fp) {
-    ...
-    _IO_FINISH(fp);                                          // Jump to __finish vtable
-    ...
+    int status;
+    CHECK_FILE(fp, EOF);
+
+#if SHLIB_COMPAT (libc, GLIBC_2_0, GLIBC_2_1)
+    if (_IO_vtable_offset (fp) != 0)
+      return _IO_old_fclose (fp);
+#endif
+
+    /* First unlink the stream.  */
+    if (fp->_IO_file_flags & _IO_IS_FILEBUF)
+      _IO_un_link ((struct _IO_FILE_plus *) fp);
+
+    _IO_acquire_lock (fp);
+    if (fp->_IO_file_flags & _IO_IS_FILEBUF)
+      status = _IO_file_close_it (fp);
+    else
+      status = fp->_flags & _IO_ERR_SEEN ? -1 : 0;
+    _IO_release_lock (fp);
+    _IO_FINISH (fp);                                         // Get here
+    if (fp->_mode > 0)
+      {
+#if _LIBC
+      struct _IO_codecvt *cc = fp->_codecvt;
+      __libc_lock_lock (__gconv_lock);
+      __gconv_release_step (cc->__cd_in.__cd.__steps);
+      __gconv_release_step (cc->__cd_out.__cd.__steps);
+      __libc_lock_unlock (__gconv_lock);
+#endif
+      }
+    else
+      {
+        if (_IO_have_backup (fp))
+	        _IO_free_backup_area (fp);
+      }
+    if (fp != _IO_stdin && fp != _IO_stdout && fp != _IO_stderr)
+      {
+        fp->_IO_file_flags = 0;
+        free(fp);
+      }
+    return status;
   }
 ```
 
@@ -209,7 +256,31 @@ When inputting name - there is a buffer overflow at the last get name scanf (.da
   fp   is at 0x0804b280 (overflow target) - 4 bytes to (fp + 0x4 [0x0804b284])
   Forge File
 
-
 Using the Leaked vmmap arrange the overflow to the following
-  (A * 32) + (fp + 4) + (forged file)
+  (A * 32) + (fp + 4) + (forged _IO_FILE_plus)
   where fp is 0x20 + .data or .bss section
+
+       ┌────────────┐ 
+  name |    AAAA    | [32 bytes]
+       |    ...     |
+       ├────────────┤
+    fp | 0x0804b284 | [4 bytes]
+       ├────────────┤
+  fake |    flag    | [76 bytes]
+       |   shell    |
+       |    AAAA    |
+       |    ...     |
+       |   *_lock   |
+       ├────────────┤
+vtable | 0x0804b2d4 | [4 bytes]
+       ├────────────┤
+  fake |    AAAA    | [12 bytes]
+  jump |    AAAA    |
+ table |  system()  |
+       └────────────┘
+
+need to avoid calling unlink which means this check must fail (fp->_IO_file_flags & _IO_IS_FILEBUF)
+_IO_IS_FILEBUF is 0x2000 so the flags in the fake file must be set accordingly to make it 0
+
+
+FLAG{F1l3_Str34m_is_4w3s0m3}
