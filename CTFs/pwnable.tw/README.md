@@ -11,6 +11,7 @@ Challenges
 - [200] re-alloc 
 - [200] tcache tear
 - [250] seethefile
-- [250] death note  (IN PROGRESS)
+- [250] death note
+- [250] starbound       IN PROGRESS
 
-Total score: 1950
+Total score: 2200

