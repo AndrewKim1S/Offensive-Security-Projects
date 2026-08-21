@@ -1,0 +1,212 @@
+
+┌─────────────┬───────────────────────────[ Starbound Writeup ]──────────────────────────────────────────
+| Description |
+└─────────────┘
+Required libraries
+http://old-releases.ubuntu.com/ubuntu/pool/main/o/openssl/libcrypto.1.0.0-udeb_1.0.0e-2ubuntu4.7_i386.udeb
+https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi8/8/x86_64/baseos/os/Packages/z/zlib-1.2.11-25.el8.i686.rpm
+$ patchelf --set-rpath '$ORIGIN/lib' ./starbound
+$ patchelf --set-rpath '$ORIGIN' lib/libcrypto.so.1.0.0
+
+
+0x080580d0 - NAME
+0x08058154 - function ptr array
+―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+main() {                                                     // 0x804a605
+  int iVar1;
+  long lVar2;
+  EVP_PKEY_CTX *in_stack_fffffee0;
+  char local_110 [264];
+  init(in_stack_fffffee0);
+  while( true ) {
+    alarm(0x3c);                                             // set alarm
+    (*_DAT_0805817c)();                                      // show certain menu. By default it is show_main_menu
+    iVar1 = readn(local_110,0x100);                          // read input 
+    if (iVar1 == 0) break;
+    lVar2 = strtol(local_110,(char **)0x0,10);               // lVar2 = int input
+    if (lVar2 == 0) break;
+    (*(code *)(&DAT_08058154)[lVar2])();                     // Execute function from funcptr array
+  }
+  do_bye();                                                  // print "Goodbye, &DAT_080580d0"
+  return 0;
+}
+―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+show_main_menu() {                                           // 0x08048d65
+  int iVar1;
+  ... print options ...
+  __printf_chk(1,&DAT_0804a792);
+  for (iVar1 = 0; iVar1 < 10; iVar1 = iVar1 + 1) {
+    (&DAT_08058154)[iVar1] = cmd_nop;
+  }
+  _DAT_08058158 = cmd_info;
+  _DAT_0805815c = cmd_move;
+  _DAT_08058160 = cmd_view;
+  _DAT_08058164 = cmd_build;
+  _DAT_08058168 = cmd_kill;
+  _DAT_0805816c = cmd_settings;
+  _DAT_08058170 = cmd_multiplayer;
+}
+
+cmd_nop() {... Nothing Important ...}                        // 0x8048f07
+
+cmd_info() {                                                 // 0x8049ab7
+  int iVar1;
+  undefined1 local_1c [24];
+  get_server_key(local_1c);
+  puts("\n-+STARBOUND v1.0: INFORMATION+-");
+  __printf_chk(1," |  Server ID: ");
+  for (iVar1 = 0; iVar1 < 0x10; iVar1 = iVar1 + 1) {
+    __printf_chk(1,&DAT_0804a97f,local_1c[iVar1]);
+  }
+  puts("");
+  __printf_chk(1," |  Seed: %08X\n",me);
+  __printf_chk(1," |  Size: %d\n",DAT_08057f84);
+  __printf_chk(1," +  Player: %s (from %s)\n",&DAT_080580d0,DAT_080580c8);
+  __printf_chk(1," |  Position: %d\n",DAT_08057f88);
+  __printf_chk(1," |  HP: %d\n",DAT_08057f90);
+  __printf_chk(1," |  Cobblestone: %d\n",DAT_08057f8c);
+  __printf_chk(1," |  Score: %d\n",DAT_08057f94);
+  puts("");
+}
+
+cmd_move() { _DAT_0805817c = show_move_menu;}                // 0x8048cfb
+
+cmd_view() {... Draw entire screen ...}                      // 0x8048f27
+
+cmd_build() { _DAT_0805817c = show_build_menu;}              // 0x8048d06
+
+cmd_kill() {                                                 // 0x8049d98
+  int iVar1;
+  undefined1 auStack_10d [265];
+  __printf_chk(1,"Why???? ");
+  iVar1 = readn(auStack_10d + 1,0x100);
+  auStack_10d[iVar1] = 0;
+  do_die(auStack_10d + 1);
+}
+
+cmd_settings() { _DAT_0805817c = show_settings_menu;}        // 0x8048d11
+
+cmd_multiplayer() { _DAT_0805817c = show_multiplayer_menu;}  // 0x8048d2f
+
+0x08058154 - main menu function ptr array
+  0x08058154[0] = 0x08058154 -> cmd_nop() 
+  0x08058154[1] = 0x08058158 -> cmd_info() 
+  0x08058154[2] = 0x0805815c -> cmd_move()
+  0x08058154[3] = 0x08058160 -> cmd_view()
+  0x08058154[4] = 0x08058164 -> cmd_build()
+  0x08058154[5] = 0x08058168 -> cmd_kill()
+  0x08058154[6] = 0x0805816c -> cmd_settings()
+  0x08058154[7] = 0x08058170 -> cmd_multiplayer()
+  0x08058154[8] = 0x08058174 -> cmd_nop()
+  0x08058154[9] = 0x08058178 -> cmd_nop()
+  0x08058154[10] = 0x0805817c -> show_main_menu()
+―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+show_move_menu() {                                           // 0x80491be
+  int iVar1;   
+  if (DAT_080580cc != 0) {
+    cmd_view();
+  }
+  ... print options ... 
+  __printf_chk(1,&DAT_0804a792);
+  for (iVar1 = 0; iVar1 < 10; iVar1 = iVar1 + 1) {
+    (&DAT_08058154)[iVar1] = cmd_nop;
+  }
+  _DAT_08058158 = cmd_go_back;
+  _DAT_0805815c = cmd_move_left;
+  _DAT_08058160 = cmd_move_right;
+  _DAT_08058164 = cmd_move_jump;
+  return;
+}
+
+cmd_go_back() { _DAT_0805817c = show_main_menu;}             // 0x08048cf0
+
+cmd_move_left() {                                            // 0x08049e47
+  DAT_08057f88 = DAT_08057f88 + -1;
+  if (DAT_08057f88 < 0) {
+    DAT_08057f88 = DAT_08057f88 + DAT_08057f84;
+  }
+  puts("[Info] Moved left...");
+  check_pos();
+  return;
+}
+
+cmd_move_right() {                                           // 0x08049e7b
+  DAT_08057f88 = DAT_08057f88 + 1;
+  if (DAT_08057f84 <= DAT_08057f88) {
+    DAT_08057f88 = DAT_08057f88 - DAT_08057f84;
+  }
+  puts("[Info] Moved right...");
+  check_pos();
+  return;
+}
+
+0x08058154 - move menu function ptr array
+  0x08058154[0] = 0x08058154 -> cmd_nop() 
+  0x08058154[1] = 0x08058158 -> cmd_go_back() 
+  0x08058154[2] = 0x0805815c -> cmd_move_left()
+  0x08058154[3] = 0x08058160 -> cmd_move_right()
+  0x08058154[4] = 0x08058164 -> cmd_move_jump()
+  0x08058154[5] = 0x08058168 -> cmd_nop()
+  0x08058154[6] = 0x0805816c -> cmd_nop()
+  0x08058154[7] = 0x08058170 -> cmd_nop()
+  0x08058154[8] = 0x08058174 -> cmd_nop()
+  0x08058154[9] = 0x08058178 -> cmd_nop()
+  0x08058154[10] = 0x0805817c -> show_move_menu()
+―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+show_settings_menu() {
+  int iVar1;
+  if (DAT_080580cc != 0) {
+    cmd_view();
+  }
+  ... print options ... 
+  __printf_chk(1,&DAT_0804a792);
+  for (iVar1 = 0; iVar1 < 10; iVar1 = iVar1 + 1) {
+    (&DAT_08058154)[iVar1] = cmd_nop;
+  }
+  _DAT_08058158 = cmd_go_back;
+  _DAT_0805815c = cmd_set_name;
+  _DAT_08058160 = cmd_set_ip;
+  _DAT_08058164 = cmd_set_autoview;
+  return;
+}
+
+cmd_set_name() {
+  int iVar1;
+  __printf_chk(1,"Enter your name: ");
+  iVar1 = readn(&DAT_080580d0,100);
+  *(undefined1 *)((int)&DAT_080580cc + iVar1 + 3) = 0;
+  return;
+}
+
+cmd_set_ip() {
+  size_t __size;
+  undefined1 local_10c [260];
+  __printf_chk(1,"Enter your IP address: ");
+  __size = readn(local_10c,0x100);
+  free(DAT_080580c8);
+  DAT_080580c8 = malloc(__size);
+  memcpy(DAT_080580c8,local_10c,__size);
+  *(undefined1 *)((int)DAT_080580c8 + (__size - 1)) = 0;
+  return;
+}
+
+cmd_set_autoview() { DAT_080580cc = (uint)(DAT_080580cc == 0);}
+―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――
+
+
+
+
+
+┌─────────┐
+| Summary |
+└─────────┘
+Essentially the program is running a console text game. Through the use of 0x08058154 (the funcptr array) different menus for
+main, move, build, settings, and multiplayer can be transitioned through.
+
+┌─────────┐
+| Exploit |
+└─────────┘
+ASLR, NX, PARTIAL RELRO, 32 bit
+
+In user input - giving input value outside 0-10 range means it will attempt to execute 0x08058154[input] assumed as funcptr
+
